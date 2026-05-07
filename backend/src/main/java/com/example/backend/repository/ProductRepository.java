@@ -25,7 +25,7 @@ public interface ProductRepository extends JpaRepository<Product, String> {
 			"ORDER BY p.quantity ASC")
 	List<Object[]> findLowStockProducts(Pageable pageable);
 
-	@Query("SELECT p.productName, p.quantity, p.imageUrl FROM Product p " +
+	@Query("SELECT p.productName, p.quantity, (SELECT max(img.url) FROM ProductImage img WHERE img.product = p) FROM Product p " +
 			"WHERE p.productId NOT IN (" +
 			"    SELECT od.product.productId FROM OrderDetail od " +
 			"    JOIN od.order o " +

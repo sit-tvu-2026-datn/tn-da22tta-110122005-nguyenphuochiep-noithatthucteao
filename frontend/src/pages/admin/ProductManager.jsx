@@ -25,10 +25,11 @@ import {
   PlusOutlined,
   UploadOutlined,
   ReloadOutlined,
-  FilterOutlined, // Import thêm icon lọc
+  FilterOutlined,
 } from "@ant-design/icons";
 import { AuthContext } from "../../context/AuthContext";
 import Cookies from "js-cookie";
+import '@google/model-viewer'; // Import model-viewer cho AR Preview
 
 const { Title } = Typography;
 
@@ -38,14 +39,15 @@ export default function ProductManager() {
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
   
-  // 1. THÊM STATE ĐỂ LƯU DANH MỤC ĐANG LỌC
   const [filterCategoryId, setFilterCategoryId] = useState(null); 
 
   const [editingProduct, setEditingProduct] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-  const [imageFile, setImageFile] = useState(null);
-  const [fileList, setFileList] = useState([]);
+  const [fileList, setFileList] = useState([]); // Chứa nhiều ảnh
+  const [arGltfFileList, setArGltfFileList] = useState([]); // Chứa AR Model .glb
+  const [arUsdzFileList, setArUsdzFileList] = useState([]); // Chứa AR Model .usdz
+
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -97,37 +99,68 @@ export default function ProductManager() {
     data.append("upload_preset", "my_interior_shop");
     data.append("folder", "image/products");
 
-    const res = await fetch(
-      "https://api.cloudinary.com/v1_1/ddnzj70uw/image/upload",
-      {
-        method: "POST",
-        body: data,
-      }
-    );
+    const endpoint = "https://api.cloudinary.com/v1_1/ddnzj70uw/image/upload";
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      body: data,
+    });
     const uploaded = await res.json();
-    if (!uploaded.secure_url) throw new Error("Upload failed");
+    if (!uploaded.secure_url) {
+       console.error("Cloudinary Error:", uploaded);
+       throw new Error("Upload failed");
+    }
     return uploaded.secure_url;
+  };
+
+  const uploadArFileToBackend = async (file) => {
+    const data = new FormData();
+    data.append("file", file);
+
+    const res = await fetch("http://localhost:8080/api/upload/ar", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      body: data,
+    });
+    const uploaded = await res.json();
+    if (!uploaded.url) {
+       console.error("Backend Error:", uploaded);
+       throw new Error("Upload failed to backend");
+    }
+    return uploaded.url;
   };
 
   const handleAdd = () => {
     setEditingProduct(null);
     form.resetFields();
-    setImageFile(null);
     setFileList([]);
+    setArGltfFileList([]);
+    setArUsdzFileList([]);
     setIsModalOpen(true);
   };
 
   const handleEdit = (record) => {
     setEditingProduct(record);
     form.setFieldsValue(record);
-    setImageFile(null);
-    if (record.imageUrl) {
-      setFileList([
-        { uid: "-1", name: "image.png", status: "done", url: record.imageUrl },
-      ]);
+    
+    if (record.imageUrls && record.imageUrls.length > 0) {
+      setFileList(record.imageUrls.map((url, i) => ({
+        uid: `-${i}`, name: `image-${i}.png`, status: "done", url: url
+      })));
     } else {
       setFileList([]);
     }
+
+    if (record.arLink) {
+      setArGltfFileList([{ uid: '-gltf', name: 'model.glb', status: "done", url: record.arLink }]);
+    } else setArGltfFileList([]);
+    
+    if (record.arModelUsdz) {
+      setArUsdzFileList([{ uid: '-usdz', name: 'model.usdz', status: "done", url: record.arModelUsdz }]);
+    } else setArUsdzFileList([]);
+
     setIsModalOpen(true);
   };
 
@@ -148,18 +181,44 @@ export default function ProductManager() {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      let imageUrl = editingProduct?.imageUrl || "";
+      
+      const newFiles = fileList.filter(f => f.originFileObj).map(f => f.originFileObj);
+      const existingUrls = fileList.filter(f => !f.originFileObj).map(f => f.url);
 
-      if (imageFile) {
+      let newUrls = [];
+      if (newFiles.length > 0) {
         messageApi.open({
           type: "loading",
-          content: "Đang tải ảnh lên Cloudinary...",
+          content: "Đang tải ảnh sản phẩm lên Cloud...",
         });
-        imageUrl = await uploadToCloudinary(imageFile);
+        newUrls = await Promise.all(newFiles.map(file => uploadToCloudinary(file)));
         messageApi.destroy();
       }
 
-      const payload = { ...values, imageUrl };
+      // Xử lý upload AR files
+      let arLink = editingProduct?.arLink || "";
+      let arModelUsdz = editingProduct?.arModelUsdz || "";
+
+      const newGltfFile = arGltfFileList.find(f => f.originFileObj)?.originFileObj;
+      if (newGltfFile) {
+        messageApi.open({ type: "loading", content: "Đang tải file 3D (.glb) lên server..." });
+        arLink = await uploadArFileToBackend(newGltfFile);
+        messageApi.destroy();
+      } else if (arGltfFileList.length === 0) {
+        arLink = "";
+      }
+
+      const newUsdzFile = arUsdzFileList.find(f => f.originFileObj)?.originFileObj;
+      if (newUsdzFile) {
+        messageApi.open({ type: "loading", content: "Đang tải file 3D (.usdz) lên server..." });
+        arModelUsdz = await uploadArFileToBackend(newUsdzFile);
+        messageApi.destroy();
+      } else if (arUsdzFileList.length === 0) {
+        arModelUsdz = "";
+      }
+
+      const imageUrls = [...existingUrls, ...newUrls];
+      const payload = { ...values, imageUrls, arLink, arModelUsdz };
       const method = editingProduct ? "PUT" : "POST";
       const url = editingProduct
         ? `http://localhost:8080/api/products/${editingProduct.productId}`
@@ -180,20 +239,18 @@ export default function ProductManager() {
       );
       setIsModalOpen(false);
       fetchProducts();
-    } catch {
+    } catch (e) {
       messageApi.error("Lưu thất bại, vui lòng kiểm tra lại");
     }
   };
 
   const handleSearch = (val) => setSearchText(val.toLowerCase());
 
-  // 2. CẬP NHẬT LOGIC LỌC: KẾT HỢP TÌM KIẾM VÀ DANH MỤC
   const filteredProducts = products.filter((p) => {
     const matchSearch =
       p.productName?.toLowerCase().includes(searchText) ||
       p.description?.toLowerCase().includes(searchText);
     
-    // Nếu filterCategoryId có giá trị thì kiểm tra xem có khớp không, nếu null thì bỏ qua (true)
     const matchCategory = filterCategoryId 
       ? p.categoryId === filterCategoryId 
       : true;
@@ -211,7 +268,7 @@ export default function ProductManager() {
           <Image
             width={50}
             height={50}
-            src={record.imageUrl}
+            src={record.imageUrls?.[0] || "https://via.placeholder.com/50"}
             className="rounded object-cover"
             fallback="https://via.placeholder.com/50"
           />
@@ -220,6 +277,9 @@ export default function ProductManager() {
             <div className="text-xs text-gray-500 font-mono">
               {record.productId}
             </div>
+            {record.arLink && (
+              <span className="text-xs text-purple-600 bg-purple-100 px-1 rounded border border-purple-200 mt-1 inline-block">Hỗ trợ AR</span>
+            )}
           </div>
         </div>
       ),
@@ -241,8 +301,6 @@ export default function ProductManager() {
       render: (v) =>
         v > 0 ? <span className="text-red-500 font-bold">-{v}%</span> : "-",
     },
-    // Thêm cột hiển thị ID Danh mục để dễ check (tùy chọn)
-    // { title: "Danh mục", dataIndex: "categoryId", width: 100 }, 
     { title: "Bảo hành", dataIndex: "warranty", responsive: ["lg"] },
     {
       title: "",
@@ -280,23 +338,21 @@ export default function ProductManager() {
               Quản lý sản phẩm
             </Title>
             <div className="text-gray-500 text-sm">
-              {/* Hiển thị số lượng sau khi lọc */}
               Hiển thị {filteredProducts.length} / {products.length} sản phẩm
             </div>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-             {/* 3. THÊM UI SELECT ĐỂ CHỌN DANH MỤC */}
             <Select
               placeholder="Lọc theo danh mục"
               style={{ width: 200 }}
-              allowClear // Cho phép xóa chọn để hiện tất cả
+              allowClear
               onChange={(value) => setFilterCategoryId(value)}
               options={categories.map((c) => ({
                 label: c.categoryName,
                 value: c.categoryId,
               }))}
-              suffixIcon={<FilterOutlined />} // Icon cái phễu cho đẹp
+              suffixIcon={<FilterOutlined />}
             />
 
             <Input
@@ -319,7 +375,7 @@ export default function ProductManager() {
 
         <Table
           rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
-          dataSource={filteredProducts} // Sử dụng danh sách đã lọc
+          dataSource={filteredProducts}
           columns={columns}
           rowKey="productId"
           loading={loading}
@@ -328,7 +384,6 @@ export default function ProductManager() {
         />
       </Card>
 
-      {/* Modal giữ nguyên không thay đổi */}
       <Modal
         title={editingProduct ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}
         open={isModalOpen}
@@ -418,30 +473,24 @@ export default function ProductManager() {
             </Col>
 
             <Col span={24} md={8}>
-              <Form.Item label="Hình ảnh">
+              <Form.Item label="Hình ảnh (Max 5 ảnh)">
                 <Upload
                   listType="picture-card"
                   fileList={fileList}
-                  maxCount={1}
-                  onRemove={() => {
-                    setFileList([]);
-                    setImageFile(null);
-                    form.setFieldValue("imageUrl", "");
+                  multiple={true}
+                  maxCount={5}
+                  onRemove={(file) => {
+                    setFileList(fileList.filter(f => f.uid !== file.uid));
                   }}
-                  beforeUpload={(file) => {
-                    setImageFile(file);
-                    setFileList([
-                      {
-                        uid: file.uid,
-                        name: file.name,
-                        status: "done",
-                        url: URL.createObjectURL(file),
-                      },
+                  beforeUpload={(file, fileListArg) => {
+                    setFileList(prev => [
+                      ...prev,
+                      { uid: file.uid, name: file.name, status: "done", url: URL.createObjectURL(file), originFileObj: file }
                     ]);
                     return false;
                   }}
                 >
-                  {fileList.length < 1 && (
+                  {fileList.length < 5 && (
                     <div className="flex flex-col items-center">
                       <UploadOutlined />
                       <div className="mt-2 text-xs">Upload</div>
@@ -449,7 +498,58 @@ export default function ProductManager() {
                   )}
                 </Upload>
               </Form.Item>
-              <Form.Item name="color" label="Màu sắc">
+              
+              <Form.Item label="Mô hình AR Web/Android (.glb)">
+                <Upload
+                  fileList={arGltfFileList}
+                  maxCount={1}
+                  accept=".glb"
+                  onRemove={() => setArGltfFileList([])}
+                  beforeUpload={(file) => {
+                    setArGltfFileList([{ uid: file.uid, name: file.name, status: "done", url: URL.createObjectURL(file), originFileObj: file }]);
+                    return false;
+                  }}
+                >
+                  {arGltfFileList.length < 1 && (
+                    <Button icon={<UploadOutlined />}>Tải lên file .glb</Button>
+                  )}
+                </Upload>
+                {arGltfFileList.length > 0 && (
+                  <div className="mt-3 border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center p-2" style={{height: 150}}>
+                     <model-viewer
+                        src={arGltfFileList[0].url}
+                        auto-rotate
+                        camera-controls
+                        style={{width: '100%', height: '100%'}}
+                     ></model-viewer>
+                  </div>
+                )}
+                {(arGltfFileList[0]?.url && !arGltfFileList[0]?.originFileObj) && (
+                   <div className="mt-2 text-xs text-green-600 truncate break-all">Đã lưu: {arGltfFileList[0].url}</div>
+                )}
+              </Form.Item>
+
+              <Form.Item label="Mô hình AR iOS (.usdz)">
+                <Upload
+                  fileList={arUsdzFileList}
+                  maxCount={1}
+                  accept=".usdz"
+                  onRemove={() => setArUsdzFileList([])}
+                  beforeUpload={(file) => {
+                    setArUsdzFileList([{ uid: file.uid, name: file.name, status: "done", url: URL.createObjectURL(file), originFileObj: file }]);
+                    return false;
+                  }}
+                >
+                  {arUsdzFileList.length < 1 && (
+                    <Button icon={<UploadOutlined />}>Tải lên file .usdz</Button>
+                  )}
+                </Upload>
+                {(arUsdzFileList[0]?.url && !arUsdzFileList[0]?.originFileObj) && (
+                   <div className="mt-2 text-xs text-green-600 truncate break-all">Đã lưu: {arUsdzFileList[0].url}</div>
+                )}
+              </Form.Item>
+
+              <Form.Item name="color" label="Màu sắc" className="mt-2">
                 <Input />
               </Form.Item>
               <Form.Item name="size" label="Kích thước">
@@ -467,4 +567,4 @@ export default function ProductManager() {
       </Modal>
     </div>
   );
-}
+}

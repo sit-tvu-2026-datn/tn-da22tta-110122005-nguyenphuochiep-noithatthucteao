@@ -15,7 +15,9 @@ public class ProductDTO {
     private String productName;
     private BigDecimal price;
     private String description;
-    private String imageUrl;
+    private java.util.List<String> imageUrls;
+    private String arLink;
+    private String arModelUsdz;
     private int quantity;
     private BigDecimal discount;
     private String categoryId;
@@ -32,7 +34,15 @@ public class ProductDTO {
         this.productName = product.getProductName();
         this.price = product.getPrice();
         this.description = product.getDescription();
-        this.imageUrl = product.getImageUrl();
+        if (product.getImages() != null && !product.getImages().isEmpty()) {
+            this.imageUrls = product.getImages().stream()
+                .map(com.example.backend.model.ProductImage::getUrl)
+                .collect(java.util.stream.Collectors.toList());
+        } else {
+            this.imageUrls = new java.util.ArrayList<>();
+        }
+        this.arLink = product.getArLink();
+        this.arModelUsdz = product.getArModelUsdz();
         this.quantity = product.getQuantity();
         this.discount = product.getDiscount();
         this.categoryId = product.getCategoryId();

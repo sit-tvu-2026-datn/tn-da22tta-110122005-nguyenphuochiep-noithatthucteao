@@ -299,7 +299,7 @@ export default function Purchase() {
                         >
                           <div className="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                             <img
-                              src={item.product?.imageUrl || nothingImg}
+                              src={item.product?.imageUrls?.[0] || item.product?.imageUrl || nothingImg}
                               alt={item.product?.productName}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
@@ -519,7 +519,7 @@ export default function Purchase() {
                   className="flex gap-4 items-center p-2 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <img
-                    src={item.product?.imageUrl}
+                    src={item.product?.imageUrls?.[0] || item.product?.imageUrl}
                     className="w-14 h-14 object-cover rounded border"
                     alt="product"
                   />

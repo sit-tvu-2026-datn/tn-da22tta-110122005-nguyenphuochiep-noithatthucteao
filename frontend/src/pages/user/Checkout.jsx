@@ -494,7 +494,7 @@ export default function Checkout() {
                   >
                     <div className="w-20 h-20 shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                       <img
-                        src={item.product?.imageUrl || item.imageUrl}
+                        src={item.product?.imageUrls?.[0] || item.product?.imageUrl || item.imageUrls?.[0] || item.imageUrl}
                         alt="product"
                         className="w-full h-full object-cover"
                       />

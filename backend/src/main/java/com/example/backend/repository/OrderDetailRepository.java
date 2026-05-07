@@ -36,12 +36,12 @@ public interface OrderDetailRepository extends JpaRepository<OrderDetail, String
             "ORDER BY SUM(od.quantity) DESC")
     List<Object[]> findTopSellingCategories(Pageable pageable);
 
-    @Query("SELECT p.productName, p.imageUrl, p.price, SUM(od.quantity) " +
+    @Query("SELECT p.productName, (SELECT max(img.url) FROM ProductImage img WHERE img.product = p), p.price, SUM(od.quantity) " +
             "FROM OrderDetail od " +
             "JOIN od.product p " +
             "JOIN od.order o " +
             "WHERE o.isOrder = true " +
-            "GROUP BY p.productName, p.imageUrl, p.price " +
+            "GROUP BY p.productId, p.productName, p.price " +
             "ORDER BY SUM(od.quantity) DESC")
     List<Object[]> findTopSellingProducts(Pageable pageable);
 }

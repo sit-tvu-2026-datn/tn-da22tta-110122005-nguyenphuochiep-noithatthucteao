@@ -1,17 +1,16 @@
 package com.example.backend.service;
 
-import com.example.backend.model.Product;
+import com.example.backend.DTO.ProductDTO;
 import java.util.List;
 import java.util.Optional;
 
 public interface ProductService {
-    List<Product> getAllProducts();
-    Optional<Product> getProductById(String id);
-    Product createProduct(Product product);
-    Product updateProduct(String id, Product product);
+    List<ProductDTO> getAllProducts();
+    Optional<ProductDTO> getProductById(String id);
+    ProductDTO createProduct(ProductDTO productDTO);
+    ProductDTO updateProduct(String id, ProductDTO productDTO);
     void deleteProduct(String id);
 
-    List<Product> getProductsByCategoryId(String categoryId);
-    List<Product> getRelatedProducts(String productId);
-
+    List<ProductDTO> getProductsByCategoryId(String categoryId);
+    List<ProductDTO> getRelatedProducts(String productId);
 }

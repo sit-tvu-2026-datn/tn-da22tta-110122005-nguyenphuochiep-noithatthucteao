@@ -374,7 +374,7 @@ export default function CartPage() {
 
                         <div className="flex-shrink-0 w-24 h-24 sm:w-32 sm:h-32 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 relative">
                           <img
-                            src={item.product.imageUrl}
+                            src={item.product?.imageUrls?.[0] || item.product?.imageUrl}
                             alt={item.product.productName}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />

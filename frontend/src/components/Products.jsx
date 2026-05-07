@@ -346,7 +346,7 @@ export default function Products() {
 
           <img
             src={
-              prod.imageUrl ||
+              prod.imageUrls?.[0] || prod.imageUrl ||
               "https://via.placeholder.com/400x400?text=No+Image"
             }
             alt={prod.productName}

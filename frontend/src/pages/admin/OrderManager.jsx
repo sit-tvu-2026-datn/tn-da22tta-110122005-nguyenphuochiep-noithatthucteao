@@ -263,9 +263,9 @@ export default function OrderManager() {
       width: 250,
       render: (_, record) => (
         <div className="flex gap-3 items-center">
-          {record.orderDetails?.[0]?.product?.imageUrl ? (
-            <img
-              src={record.orderDetails[0].product.imageUrl}
+          {record.orderDetails?.[0]?.product?.imageUrls?.[0] || record.orderDetails?.[0]?.product?.imageUrl ? (
+            <Image
+              src={record.orderDetails[0].product.imageUrls?.[0] || record.orderDetails[0].product.imageUrl}
               className="w-12 h-12 rounded border object-cover"
               alt="product"
             />
@@ -604,7 +604,7 @@ export default function OrderManager() {
                   className="flex gap-4 items-center bg-white border p-2 rounded hover:shadow-sm transition"
                 >
                   <img
-                    src={d.product?.imageUrl}
+                    src={d.product?.imageUrls?.[0] || d.product?.imageUrl}
                     alt="product"
                     className="w-16 h-16 object-cover rounded bg-gray-100"
                   />

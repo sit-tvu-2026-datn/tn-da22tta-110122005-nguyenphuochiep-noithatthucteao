@@ -29,8 +29,13 @@ public class Product {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "image_url", length = 255)
-    private String imageUrl;
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<ProductImage> images = new java.util.ArrayList<>();
+
+    @Column(name = "ar_link", length = 1000)
+    private String arLink;
+
+    private String arModelUsdz;
 
     @Column(columnDefinition = "INT DEFAULT 0")
     private int quantity;

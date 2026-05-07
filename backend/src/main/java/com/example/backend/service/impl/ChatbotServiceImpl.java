@@ -161,7 +161,7 @@ public class ChatbotServiceImpl implements ChatbotService {
                     String productLink = FRONTEND_URL + "/product/" + p.getProductId();
 
                     // Xử lý ảnh (Tạo link tuyệt đối)
-                    String rawImg = p.getImageUrl();
+                    String rawImg = p.getImages() != null && !p.getImages().isEmpty() ? p.getImages().get(0).getUrl() : null;
                     String finalImgUrl;
                     if (rawImg == null || rawImg.isEmpty()) {
                         finalImgUrl = "https://via.placeholder.com/300x200.png?text=No+Image";
