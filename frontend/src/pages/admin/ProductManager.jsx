@@ -88,24 +88,20 @@ export default function ProductManager() {
     }
   };
 
-  const uploadToCloudinary = async (file) => {
+  const uploadToSupabase = async (file) => {
     const data = new FormData();
     data.append("file", file);
-    data.append("upload_preset", "my_interior_shop");
-    data.append("folder", "image/products");
 
-    const endpoint = "https://api.cloudinary.com/v1_1/ddnzj70uw/image/upload";
-
-    const res = await fetch(endpoint, {
-      method: "POST",
-      body: data,
-    });
-    const uploaded = await res.json();
-    if (!uploaded.secure_url) {
-       console.error("Cloudinary Error:", uploaded);
-       throw new Error("Upload failed");
+    try {
+      const res = await api.post("/api/upload/image", data, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      if (!res.data.url) throw new Error("Upload failed");
+      return res.data.url;
+    } catch (err) {
+      console.error("Supabase Error:", err);
+      throw new Error("Upload failed to Supabase");
     }
-    return uploaded.secure_url;
   };
 
   const uploadArFileToBackend = async (file) => {
@@ -180,7 +176,7 @@ export default function ProductManager() {
           type: "loading",
           content: "Đang tải ảnh sản phẩm lên Cloud...",
         });
-        newUrls = await Promise.all(newFiles.map(file => uploadToCloudinary(file)));
+        newUrls = await Promise.all(newFiles.map(file => uploadToSupabase(file)));
         messageApi.destroy();
       }
 

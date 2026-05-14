@@ -5,6 +5,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.example.backend.DTO.FileUploadResponse;
+import com.example.backend.exception.FileUploadException;
+import com.example.backend.exception.FileValidationException;
+import com.example.backend.service.SupabaseStorageService;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,6 +27,9 @@ import java.util.Map;
 public class FileUploadController {
 
     private final String UPLOAD_DIR = "uploads/models/";
+
+    @Autowired
+    private SupabaseStorageService supabaseStorageService;
 
     @PostMapping("/ar")
     @PreAuthorize("hasRole('ADMIN')")
@@ -52,6 +61,30 @@ public class FileUploadController {
         } catch (IOException e) {
             response.put("error", "Lỗi khi lưu file: " + e.getMessage());
             return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @PostMapping("/image")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<FileUploadResponse> uploadImageFile(@RequestParam("file") MultipartFile file) {
+        try {
+            String publicUrl = supabaseStorageService.uploadFile(file);
+            FileUploadResponse response = FileUploadResponse.builder()
+                    .url(publicUrl)
+                    .fileName(file.getOriginalFilename())
+                    .message("Upload thành công")
+                    .build();
+            return ResponseEntity.ok(response);
+        } catch (FileValidationException e) {
+            FileUploadResponse response = FileUploadResponse.builder()
+                    .message(e.getMessage())
+                    .build();
+            return ResponseEntity.badRequest().body(response);
+        } catch (FileUploadException | IOException e) {
+            FileUploadResponse response = FileUploadResponse.builder()
+                    .message("Upload thất bại: " + e.getMessage())
+                    .build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 }
