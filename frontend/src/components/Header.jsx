@@ -5,10 +5,9 @@ import {
   Search,
   LogOut,
   Shield,
-  UserCircle,
   Settings,
 } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom"; // Import useSearchParams
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { CartContext } from "../context/CartContext";
 import MainMenu from "./MainMenu";
@@ -17,20 +16,25 @@ import Cookies from "js-cookie";
 
 export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // --- THÊM STATE CHO HIỆU ỨNG CUỘN ---
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
   const { cartCount, refreshCartCount, resetCartCount } =
     useContext(CartContext);
   const { user, logout } = useContext(AuthContext);
 
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams(); // Hook để lấy param từ URL
-  const [keyword, setKeyword] = useState(searchParams.get("search") || ""); // Init state từ URL nếu có
+  const [searchParams] = useSearchParams();
+  const [keyword, setKeyword] = useState(searchParams.get("search") || "");
 
   const menuRef = useRef(null);
   const [messageApi, contextHolder] = message.useMessage();
 
   const isLoggedIn = !!user;
 
-  // Sync input với URL khi URL thay đổi (trường hợp user back/forward)
+  // Sync input với URL khi URL thay đổi
   useEffect(() => {
     setKeyword(searchParams.get("search") || "");
   }, [searchParams]);
@@ -45,6 +49,32 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [user]);
 
+  // --- THÊM USEEFFECT XỬ LÝ SỰ KIỆN SCROLL ---
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      // Nếu ở sát trên cùng thì luôn hiện (tránh giật lag ở top)
+      if (currentScrollY < 10) {
+        setIsVisible(true);
+      } else if (currentScrollY > lastScrollY) {
+        // Đang cuộn xuống -> Ẩn
+        setIsVisible(false);
+        // Đóng luôn menu user nếu đang mở để tránh lỗi UI
+        setShowUserMenu(false);
+      } else {
+        // Đang cuộn lên -> Hiện
+        setIsVisible(true);
+      }
+
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [lastScrollY]);
+  // ------------------------------------------
+
   const handleLogout = () => {
     logout();
     resetCartCount();
@@ -53,14 +83,10 @@ export default function Header() {
     navigate("/");
   };
 
-  // --- XỬ LÝ TÌM KIẾM ---
   const handleSearch = () => {
     if (keyword.trim()) {
-      // Chuyển hướng sang trang chứa component Products kèm query param
-      // LƯU Ý: Thay '/products' bằng đường dẫn thực tế chứa danh sách sản phẩm của bạn (ví dụ: '/' nếu là trang chủ)
       navigate(`/products?search=${encodeURIComponent(keyword.trim())}`);
     } else {
-      // Nếu xóa trắng ô tìm kiếm thì quay về trang sản phẩm gốc
       navigate(`/products`);
     }
   };
@@ -70,10 +96,12 @@ export default function Header() {
       handleSearch();
     }
   };
-  // ---------------------
 
   return (
-    <header className="bg-white border-b border-gray-200 fixed top-0 w-full z-50 shadow-sm transition-all">
+    <header
+      className={`bg-white border-b border-gray-200 fixed top-0 w-full z-50 shadow-sm transition-transform duration-300 ease-in-out ${isVisible ? "translate-y-0" : "-translate-y-full"
+        }`}
+    >
       {contextHolder}
 
       {/* TẦNG 1: LOGO - SEARCH - ACTIONS */}
@@ -87,7 +115,7 @@ export default function Header() {
             NPH <span className="text-blue-600">STORE</span>
           </Link>
 
-          {/* Search Bar (ĐÃ CẬP NHẬT) */}
+          {/* Search Bar */}
           <div className="hidden md:flex flex-1 max-w-lg mx-auto relative">
             <input
               type="text"
@@ -109,9 +137,8 @@ export default function Header() {
             />
           </div>
 
-          {/* Actions: Cart & User (GIỮ NGUYÊN) */}
+          {/* Actions: Cart & User */}
           <div className="flex items-center gap-3 sm:gap-5 shrink-0">
-            {/* ... (Phần Cart và User giữ nguyên như code cũ) ... */}
             <button
               onClick={() => navigate("/cart")}
               className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-full transition group"
@@ -151,6 +178,7 @@ export default function Header() {
                       <img
                         src={user.avatar}
                         className="w-full h-full object-cover"
+                        alt="avatar"
                       />
                     ) : (
                       <User className="p-1.5 w-full h-full text-gray-400" />
