@@ -34,18 +34,15 @@ export default function CategoryManager() {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/categories", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.status === 401 || response.status === 403) {
+      const response = await api.get("/api/categories");
+      setCategories(response.data);
+    } catch (err) {
+      console.error("API Error:", err);
+      if (err.response && (err.response.status === 401 || err.response.status === 403)) {
         messageApi.error("Phiên đăng nhập đã hết hạn!");
         logout();
         return;
       }
-      if (!response.ok) throw new Error("Fetch failed");
-      const data = await response.json();
-      setCategories(data);
-    } catch {
       messageApi.error("Không thể tải danh sách danh mục");
     } finally {
       setLoading(false);
@@ -66,15 +63,12 @@ export default function CategoryManager() {
 
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`/api/categories/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) throw new Error("Delete failed");
+      await api.delete(`/api/categories/${id}`);
       messageApi.success("Xóa danh mục thành công");
       fetchCategories();
       setSelectedRowKeys(prev => prev.filter(key => key !== id));
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể xóa danh mục (có thể đang chứa sản phẩm)");
     }
   };
@@ -100,13 +94,7 @@ export default function CategoryManager() {
     try {
       setLoading(true);
       const deletePromises = selectedRowKeys.map(id =>
-          fetch(`/api/categories/${id}`, {
-              method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` },
-          }).then(res => {
-             if(!res.ok) throw new Error(`Failed to delete ${id}`);
-             return id;
-          })
+          api.delete(`/api/categories/${id}`)
       );
 
       const results = await Promise.allSettled(deletePromises);
@@ -122,7 +110,8 @@ export default function CategoryManager() {
 
       setSelectedRowKeys([]);
       fetchCategories();
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Có lỗi xảy ra trong quá trình xóa.");
     } finally {
       setLoading(false);
@@ -133,20 +122,12 @@ export default function CategoryManager() {
     try {
       const values = await form.validateFields();
       setLoading(true);
-      const method = editingCategory ? "PUT" : "POST";
+      const method = editingCategory ? "put" : "post";
       const url = editingCategory
         ? `/api/categories/${editingCategory.categoryId}`
         : "/api/categories";
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(values),
-      });
-      if (!response.ok) throw new Error("Save failed");
+      await api[method](url, values);
 
       messageApi.success(
         editingCategory
@@ -155,7 +136,8 @@ export default function CategoryManager() {
       );
       setIsModalOpen(false);
       fetchCategories();
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Lưu thất bại, mã danh mục có thể đã tồn tại.");
     } finally {
       setLoading(false);

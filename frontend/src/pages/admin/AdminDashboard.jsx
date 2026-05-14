@@ -123,10 +123,10 @@ export default function AdminDashboard() {
       setStatusLoading(true);
       try {
         const url = `${BASE_URL}/orders/status?startDate=${start.toISOString()}&endDate=${end.toISOString()}`;
-        const res = await fetch(url, { headers });
+        const res = await api.get(url);
 
-        if (res.ok) {
-          const data = await res.json();
+        if (res.data) {
+          const data = res.data;
           if (Array.isArray(data) && data.length > 0) {
             const formatted = data.map((item) => {
               const key = item.name ? item.name.toUpperCase() : "";
@@ -172,49 +172,43 @@ export default function AdminDashboard() {
           resStock,
           resStagnant,
         ] = await Promise.all([
-          fetch(`${BASE_URL}/categories/top`, { headers }).catch(() => null),
-          fetch(`${BASE_URL}/products/top`, { headers }).catch(() => null),
-          fetch(`${BASE_URL}/overview`, { headers: headersJson }).catch(
-            () => null
-          ),
-          fetch(`${BASE_URL}/chart/revenue-comparison`, { headers }).catch(
-            () => null
-          ),
-          fetch(`${BASE_URL}/customers/top`, { headers }).catch(() => null),
-          fetch(`${BASE_URL}/orders/peak-hours`, { headers }).catch(() => null),
-          fetch(`${BASE_URL}/products/low-stock`, { headers }).catch(
-            () => null
-          ),
-          fetch(`${BASE_URL}/products/stagnant`, { headers }).catch(() => null),
+          api.get(`${BASE_URL}/categories/top`).catch(() => null),
+          api.get(`${BASE_URL}/products/top`).catch(() => null),
+          api.get(`${BASE_URL}/overview`).catch(() => null),
+          api.get(`${BASE_URL}/chart/revenue-comparison`).catch(() => null),
+          api.get(`${BASE_URL}/customers/top`).catch(() => null),
+          api.get(`${BASE_URL}/orders/peak-hours`).catch(() => null),
+          api.get(`${BASE_URL}/products/low-stock`).catch(() => null),
+          api.get(`${BASE_URL}/products/stagnant`).catch(() => null),
         ]);
 
         // Xử lý Top Categories
-        if (resCat && resCat.ok) {
-          const data = await resCat.json();
+        if (resCat && resCat.data) {
+          const data = resCat.data;
           setTopCategories(
             data.map((item) => ({ name: item.name, sales: item.value }))
           );
         }
 
         // Xử lý Hàng ế (Stagnant Products)
-        if (resStagnant && resStagnant.ok) {
-          setStagnantData(await resStagnant.json());
+        if (resStagnant && resStagnant.data) {
+          setStagnantData(resStagnant.data);
         }
 
         // Xử lý Top Products
-        if (resProd && resProd.ok) {
-          const data = await resProd.json();
+        if (resProd && resProd.data) {
+          const data = resProd.data;
           setTopProducts(data.map((item, idx) => ({ key: idx, ...item })));
         }
 
         // Xử lý KPI
-        if (resKPI && resKPI.ok) {
-          setKpiData(await resKPI.json());
+        if (resKPI && resKPI.data) {
+          setKpiData(resKPI.data);
         }
 
         // Xử lý Comparison Chart
-        if (resComp && resComp.ok) {
-          const data = await resComp.json();
+        if (resComp && resComp.data) {
+          const data = resComp.data;
           setComparisonData(
             Array.isArray(data) && data.length > 0
               ? data
@@ -223,19 +217,19 @@ export default function AdminDashboard() {
         }
 
         // Xử lý Top Customers
-        if (resCust && resCust.ok) {
-          const data = await resCust.json();
+        if (resCust && resCust.data) {
+          const data = resCust.data;
           setTopCustomers(data.map((item, idx) => ({ key: idx, ...item })));
         }
 
         // Xử lý Peak Hours
-        if (resPeak && resPeak.ok) {
-          setPeakHourData(await resPeak.json());
+        if (resPeak && resPeak.data) {
+          setPeakHourData(resPeak.data);
         }
 
         // Xử lý Low Stock
-        if (resStock && resStock.ok) {
-          setLowStockData(await resStock.json());
+        if (resStock && resStock.data) {
+          setLowStockData(resStock.data);
         }
 
         // Gọi Status lần đầu theo dateRange mặc định

@@ -34,18 +34,15 @@ export default function UserManager() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.status === 401 || response.status === 403) {
+      const response = await api.get("/api/users");
+      setUsers(response.data);
+    } catch (err) {
+      console.error("API Error:", err);
+      if (err.response && (err.response.status === 401 || err.response.status === 403)) {
         messageApi.error("Phiên đăng nhập đã hết hạn!");
         logout();
         return;
       }
-      if (!response.ok) throw new Error("Fetch failed");
-      const data = await response.json();
-      setUsers(data);
-    } catch {
       messageApi.error("Không thể tải danh sách người dùng");
     } finally {
       setLoading(false);
@@ -69,14 +66,11 @@ export default function UserManager() {
 
   const handleDelete = async (userId) => {
     try {
-      const response = await fetch(`/api/users/${userId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) throw new Error("Delete failed");
+      await api.delete(`/api/users/${userId}`);
       messageApi.success("Xóa người dùng thành công");
       fetchUsers();
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể xóa người dùng");
     }
   };
@@ -89,16 +83,14 @@ export default function UserManager() {
   const handleConfirmDelete = async () => {
     try {
       for (const id of selectedRowKeys) {
-        await fetch(`/api/users/${id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await api.delete(`/api/users/${id}`);
       }
       messageApi.success("Đã xóa người dùng được chọn");
       setSelectedRowKeys([]);
       fetchUsers();
       setIsDeleteModalOpen(false);
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể xóa người dùng được chọn");
     }
   };
@@ -109,25 +101,18 @@ export default function UserManager() {
       if (editingUser && !values.avatar) {
         values.avatar = editingUser.avatar;
       }
-      const method = editingUser ? "PUT" : "POST";
+      const method = editingUser ? "put" : "post";
       const url = editingUser
         ? `/api/users/${editingUser.userId}`
         : "/api/auth/register";
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(values),
-      });
-      if (!response.ok) throw new Error("Save failed");
+      await api[method](url, values);
 
       messageApi.success(editingUser ? "Cập nhật thành công" : "Thêm mới thành công");
       setIsModalOpen(false);
       fetchUsers();
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Lưu thất bại, vui lòng kiểm tra lại");
     }
   };

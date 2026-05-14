@@ -71,9 +71,8 @@ export default function StatsPage() {
   };
 
   const fetchData = async (url) => {
-    const response = await fetch(url, getFetchOptions());
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return await response.json();
+    const response = await api.get(url);
+    return response.data;
   };
 
   const formatCurrency = (value) =>

@@ -35,20 +35,15 @@ export default function SlideshowManager() {
     setLoading(true);
     try {
       // Gọi API lấy danh sách cho Admin (bao gồm cả ẩn)
-      const response = await fetch("/api/slideshows/admin", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (response.status === 401 || response.status === 403) {
+      const response = await api.get("/api/slideshows/admin");
+      setSlides(response.data);
+    } catch (err) {
+      console.error("API Error:", err);
+      if (err.response && (err.response.status === 401 || err.response.status === 403)) {
         messageApi.error("Phiên đăng nhập đã hết hạn!");
         logout();
         return;
       }
-      
-      if (!response.ok) throw new Error("Fetch failed");
-      const data = await response.json();
-      setSlides(data);
-    } catch {
       messageApi.error("Không thể tải danh sách slideshow");
     } finally {
       setLoading(false);
@@ -73,16 +68,12 @@ export default function SlideshowManager() {
   // 3. Hành động Xóa (Đơn lẻ)
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`/api/slideshows/admin/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) throw new Error("Delete failed");
-      
+      await api.delete(`/api/slideshows/admin/${id}`);
       messageApi.success("Xóa slide thành công");
       fetchSlides();
       setSelectedRowKeys((prev) => prev.filter((key) => key !== id));
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể xóa slide này.");
     }
   };
@@ -108,15 +99,7 @@ export default function SlideshowManager() {
   const handleConfirmDelete = async () => {
     try {
       setLoading(true);
-      const deletePromises = selectedRowKeys.map(id =>
-          fetch(`/api/slideshows/admin/${id}`, {
-              method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` },
-          }).then(res => {
-              if(!res.ok) throw new Error(`Failed to delete ${id}`);
-              return id;
-          })
-      );
+      const deletePromises = selectedRowKeys.map(id => api.delete(`/api/slideshows/admin/${id}`));
 
       const results = await Promise.allSettled(deletePromises);
       const successfulDeletes = results.filter(r => r.status === 'fulfilled').length;
@@ -129,7 +112,8 @@ export default function SlideshowManager() {
 
       setSelectedRowKeys([]);
       fetchSlides();
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Có lỗi xảy ra trong quá trình xóa.");
     } finally {
       setLoading(false);
@@ -143,23 +127,14 @@ export default function SlideshowManager() {
       setLoading(true);
       
       const isUpdate = !!editingSlide;
-      const method = isUpdate ? "PUT" : "POST";
+      const method = isUpdate ? "put" : "post";
       
       // Nếu update thì cần ID trên URL, nếu tạo mới thì không
       const url = isUpdate
         ? `/api/slideshows/admin/${editingSlide.id}`
         : "/api/slideshows/admin";
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(values),
-      });
-
-      if (!response.ok) throw new Error("Save failed");
+      await api[method](url, values);
 
       messageApi.success(isUpdate ? "Cập nhật slide thành công" : "Thêm slide thành công");
       setIsModalOpen(false);

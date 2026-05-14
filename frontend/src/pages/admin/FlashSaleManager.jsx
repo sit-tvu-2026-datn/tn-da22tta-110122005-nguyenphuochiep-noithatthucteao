@@ -80,25 +80,21 @@ export default function FlashSaleManager() {
     setLoading(true);
     try {
       // Gọi API lấy tất cả danh sách cho Admin
-      const res = await fetch("/api/flash-sales/all-admin", { 
-         headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if(res.ok) {
-        const data = await res.json();
-        setFlashSales(data);
-      } else {
+      const res = await api.get("/api/flash-sales/all-admin");
+      setFlashSales(res.data);
+    } catch (err) {
+      if (err.response && err.response.status === 404) {
          // Fallback nếu chưa có API all-admin thì gọi current
-         const resCurrent = await fetch("/api/flash-sales/current", {
-            headers: { Authorization: `Bearer ${token}` }
-         });
-         if (resCurrent.ok) {
-             const data = await resCurrent.json();
-             setFlashSales(Array.isArray(data) ? data : [data]); 
+         try {
+             const resCurrent = await api.get("/api/flash-sales/current");
+             setFlashSales(Array.isArray(resCurrent.data) ? resCurrent.data : [resCurrent.data]);
+         } catch (e) {
+             console.error("API Error:", e);
          }
+      } else {
+         console.error("API Error:", err);
+         messageApi.error("Không thể tải danh sách Flash Sale");
       }
-    } catch {
-      messageApi.error("Không thể tải danh sách Flash Sale");
     } finally {
       setLoading(false);
     }
@@ -106,22 +102,20 @@ export default function FlashSaleManager() {
 
   const fetchAllProducts = async () => {
     try {
-      const res = await fetch("/api/products");
-      const data = await res.json();
-      setProducts(data);
+      const res = await api.get("/api/products");
+      setProducts(res.data);
     } catch (err) {
+      console.error("API Error:", err);
       console.error("Lỗi tải sản phẩm:", err);
     }
   };
 
   const fetchSaleItems = async (saleId) => {
     try {
-      const res = await fetch(`/api/flash-sales/${saleId}`, {
-         headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setCurrentSaleItems(data.items || []);
-    } catch {
+      const res = await api.get(`/api/flash-sales/${saleId}`);
+      setCurrentSaleItems(res.data.items || []);
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Lỗi tải chi tiết đợt sale");
     }
   };
@@ -164,24 +158,16 @@ export default function FlashSaleManager() {
         ? `/api/flash-sales/${editingSale.flashSaleId}` 
         : "/api/flash-sales";
         
-      const method = editingSale ? "PUT" : "POST";
+      const method = editingSale ? "put" : "post";
 
-      const res = await fetch(url, {
-        method: method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error("Lỗi khi lưu");
+      await api[method](url, payload);
 
       messageApi.success(editingSale ? "Cập nhật thành công" : "Tạo mới thành công");
       setIsModalOpen(false);
       fetchFlashSales(); // Load lại bảng
 
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Thao tác thất bại. Vui lòng thử lại.");
     }
   };
@@ -189,33 +175,22 @@ export default function FlashSaleManager() {
   // --- [NEW] HÀM CẬP NHẬT TRẠNG THÁI ---
   const handleUpdateStatus = async (id, newStatus) => {
       try {
-          const res = await fetch(`/api/flash-sales/${id}/status`, {
-              method: "PUT",
-              headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ status: newStatus }),
-          });
-
-          if (!res.ok) throw new Error("Failed");
-          
+          await api.put(`/api/flash-sales/${id}/status`, { status: newStatus });
           messageApi.success(`Đã chuyển trạng thái sang ${newStatus}`);
           fetchFlashSales(); // Load lại để thấy thay đổi
-      } catch {
+      } catch (err) {
+          console.error("API Error:", err);
           messageApi.error("Không thể cập nhật trạng thái");
       }
   };
 
   const handleDeleteSale = async (id) => {
     try {
-      await fetch(`/api/flash-sales/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/api/flash-sales/${id}`);
       messageApi.success("Đã xóa chương trình");
       fetchFlashSales();
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Xóa thất bại");
     }
   };
@@ -237,23 +212,15 @@ export default function FlashSaleManager() {
          quantity: values.quantity
       };
 
-      const res = await fetch(`/api/flash-sales/${currentSaleId}/items`, {
-        method: "POST",
-        headers: { 
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if(!res.ok) throw new Error("Failed");
+      await api.post(`/api/flash-sales/${currentSaleId}/items`, payload);
 
       messageApi.success("Đã thêm sản phẩm");
       setIsAddItemModalOpen(false);
       formItem.resetFields();
       fetchSaleItems(currentSaleId);
       fetchFlashSales(); // Load lại bảng cha để cập nhật số lượng SP
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Thêm sản phẩm thất bại");
     }
   };

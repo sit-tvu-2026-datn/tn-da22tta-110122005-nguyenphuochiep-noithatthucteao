@@ -190,13 +190,11 @@ export default function OrderManager() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/orders", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json();      
+      const res = await api.get("/api/orders");
+      const data = res.data;      
       setOrders(data.sort((a, b) => b.orderId.localeCompare(a.orderId)));
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể tải danh sách đơn hàng");
     } finally {
       setLoading(false);
@@ -206,22 +204,17 @@ export default function OrderManager() {
   const updateStatus = async (orderId, newStatus) => {
     try {
       setLoading(true);
-      const res = await fetch(
-        `/api/orders/${orderId}/status`,
-        {
-          method: "PUT",
-          headers: { Authorization: `Bearer ${token}` },
-          body: newStatus,
-        }
-      );
-      if (!res.ok) throw new Error();
+      await api.put(`/api/orders/${orderId}/status`, newStatus, {
+        headers: { "Content-Type": "text/plain" }
+      });
       setOrders((prev) =>
         prev.map((o) =>
           o.orderId === orderId ? { ...o, orderStatus: newStatus } : o
         )
       );
       messageApi.success("Cập nhật trạng thái thành công!");
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể cập nhật trạng thái");
     } finally {
       setLoading(false);
@@ -230,18 +223,7 @@ export default function OrderManager() {
 
   const updatePaymentStatus = async (paymentId, newStatus) => {
     try {
-      const res = await fetch(
-        `/api/payments/${paymentId}/status`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ paymentStatus: newStatus }),
-        }
-      );
-      if (!res.ok) throw new Error();
+      await api.put(`/api/payments/${paymentId}/status`, { paymentStatus: newStatus });
       messageApi.success("Cập nhật thanh toán thành công!");
       setOrders((prev) =>
         prev.map((order) =>
@@ -253,7 +235,8 @@ export default function OrderManager() {
             : order
         )
       );
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể cập nhật thanh toán!");
     }
   };

@@ -109,25 +109,17 @@ export default function EditProfile() {
     setIsSaving(true);
 
     try {
-      const res = await fetch(`/api/users/${user.userId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          fullName,
-          phoneNumber,
-          address,
-          gender,
-          birthDate,
-          role,
-          avatar: avatarPreview,
-        }),
+      const res = await api.put(`/api/users/${user.userId}`, {
+        fullName,
+        phoneNumber,
+        address,
+        gender,
+        birthDate,
+        role,
+        avatar: avatarPreview,
       });
 
-      if (!res.ok) throw new Error("Cập nhật thất bại!");
-      const updatedUser = await res.json();
+      const updatedUser = res.data;
 
       login(updatedUser, token);
       messageApi.success("Cập nhật hồ sơ thành công!");

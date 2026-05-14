@@ -66,20 +66,15 @@ export default function CouponManager() {
   const fetchCoupons = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/coupons", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.status === 401 || response.status === 403) {
+      const response = await api.get("/api/coupons");
+      setCoupons(response.data);
+    } catch (err) {
+      console.error("API Error:", err);
+      if (err.response && (err.response.status === 401 || err.response.status === 403)) {
         messageApi.error("Phiên đăng nhập đã hết hạn!");
         logout();
         return;
       }
-
-      if (!response.ok) throw new Error("Fetch failed");
-      const data = await response.json();
-      setCoupons(data);
-    } catch {
       messageApi.error("Không thể tải danh sách voucher");
     } finally {
       setLoading(false);
@@ -128,38 +123,28 @@ export default function CouponManager() {
         ? `/api/coupons/${editingCoupon.couponId}`
         : "/api/coupons";
 
-      const method = editingCoupon ? "PUT" : "POST";
+      const method = editingCoupon ? "put" : "post";
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) throw new Error("Save failed");
+      await api[method](url, payload);
 
       messageApi.success(
         editingCoupon ? "Cập nhật thành công" : "Thêm thành công"
       );
       setIsModalOpen(false);
       fetchCoupons();
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Lưu thất bại, vui lòng kiểm tra dữ liệu");
     }
   };
 
   const handleDelete = async (id) => {
     try {
-      await fetch(`/api/coupons/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/api/coupons/${id}`);
       messageApi.success("Xóa thành công");
       fetchCoupons();
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể xóa voucher");
     }
   };
@@ -172,33 +157,25 @@ export default function CouponManager() {
   const handleConfirmDelete = async () => {
     try {
       for (const id of selectedRowKeys) {
-        await fetch(`/api/coupons/${id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await api.delete(`/api/coupons/${id}`);
       }
       messageApi.success("Đã xóa các voucher được chọn");
       setSelectedRowKeys([]);
       setIsDeleteModalOpen(false);
       fetchCoupons();
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể xóa các voucher được chọn");
     }
   };
 
   const toggleStatus = async (id, currentStatus) => {
     try {
-      await fetch(`/api/coupons/${id}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: !currentStatus }),
-      });
+      await api.put(`/api/coupons/${id}/status`, { status: !currentStatus });
       message.success("Cập nhật trạng thái thành công");
       fetchCoupons();
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       message.error("Cập nhật trạng thái thất bại");
     }
   };

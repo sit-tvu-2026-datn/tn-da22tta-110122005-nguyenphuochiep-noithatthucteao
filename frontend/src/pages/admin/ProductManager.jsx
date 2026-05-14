@@ -68,13 +68,10 @@ export default function ProductManager() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/products", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Fetch failed");
-      const data = await res.json();
-      setProducts(data);
-    } catch {
+      const res = await api.get("/api/products");
+      setProducts(res.data);
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể tải danh sách sản phẩm");
     } finally {
       setLoading(false);
@@ -83,13 +80,10 @@ export default function ProductManager() {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch("/api/categories", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setCategories(data);
-    } catch {
+      const res = await api.get("/api/categories");
+      setCategories(res.data);
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể tải danh mục");
     }
   };
@@ -118,19 +112,16 @@ export default function ProductManager() {
     const data = new FormData();
     data.append("file", file);
 
-    const res = await fetch("/api/upload/ar", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      body: data,
-    });
-    const uploaded = await res.json();
-    if (!uploaded.url) {
-       console.error("Backend Error:", uploaded);
-       throw new Error("Upload failed to backend");
+    try {
+      const res = await api.post("/api/upload/ar", data, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      if (!res.data.url) throw new Error("Upload failed to backend");
+      return res.data.url;
+    } catch (err) {
+      console.error("Backend Error:", err);
+      throw new Error("Upload failed to backend");
     }
-    return uploaded.url;
   };
 
   const handleAdd = () => {
@@ -167,14 +158,11 @@ export default function ProductManager() {
 
   const handleDelete = async (id) => {
     try {
-      const res = await fetch(`/api/products/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error();
+      await api.delete(`/api/products/${id}`);
       messageApi.success("Xóa sản phẩm thành công");
       fetchProducts();
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể xóa sản phẩm");
     }
   };
@@ -220,27 +208,20 @@ export default function ProductManager() {
 
       const imageUrls = [...existingUrls, ...newUrls];
       const payload = { ...values, imageUrls, arLink, arModelUsdz };
-      const method = editingProduct ? "PUT" : "POST";
+      const method = editingProduct ? "put" : "post";
       const url = editingProduct
         ? `/api/products/${editingProduct.productId}`
         : "/api/products";
 
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      await api[method](url, payload);
 
-      if (!res.ok) throw new Error();
       messageApi.success(
         editingProduct ? "Cập nhật thành công" : "Thêm sản phẩm thành công"
       );
       setIsModalOpen(false);
       fetchProducts();
     } catch (e) {
+      console.error("API Error:", e);
       messageApi.error("Lưu thất bại, vui lòng kiểm tra lại");
     }
   };

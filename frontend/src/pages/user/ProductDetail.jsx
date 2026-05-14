@@ -92,18 +92,12 @@ export default function ProductDetail() {
   useEffect(() => {
     const fetchFlashSale = async () => {
       try {
-        const res = await fetch("/api/flash-sales/current");
-        if (res.ok) {
-          const text = await res.text();
-          if (text) {
-            const data = JSON.parse(text);
-            if (data && data.status === "Active") {
-              setFlashSale(data);
-            }
-          }
+        const res = await api.get("/api/flash-sales/current");
+        if (res.data && res.data.status === "Active") {
+          setFlashSale(res.data);
         }
-      } catch (e) {
-        console.warn("Lỗi Flash Sale:", e);
+      } catch (err) {
+        console.error("API Error:", err);
       }
     };
     fetchFlashSale();
@@ -114,12 +108,12 @@ export default function ProductDetail() {
     const fetchProduct = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/products/${productId}`);
-        if (!res.ok) throw new Error("Không thể tải sản phẩm");
-        const data = await res.json();
+        const res = await api.get(`/api/products/${productId}`);
+        const data = res.data;
         setProduct(data);
         setQuantity(1);
       } catch (err) {
+        console.error("API Error:", err);
         const isProd1 =
           productId === "1" || productId === "test-ar-1" || productId === "p1";
         setProduct({
@@ -168,20 +162,20 @@ export default function ProductDetail() {
     if (!productId) return;
     const fetchRelated = async () => {
       try {
-        const res = await fetch(`/api/products/${productId}/related`);
-        if (res.ok) setRelatedProducts(await res.json());
+        const res = await api.get(`/api/products/${productId}/related`);
+        setRelatedProducts(res.data);
       } catch (err) {
-        console.error(err);
+        console.error("API Error:", err);
       }
     };
     fetchRelated();
 
     const fetchReviews = async () => {
       try {
-        const res = await fetch(`/api/reviews/product/${productId}`);
-        if (res.ok) setReviews((await res.json()).reverse());
-      } catch (error) {
-        console.error(error);
+        const res = await api.get(`/api/reviews/product/${productId}`);
+        setReviews((res.data).reverse());
+      } catch (err) {
+        console.error("API Error:", err);
       }
     };
     fetchReviews();
@@ -191,23 +185,18 @@ export default function ProductDetail() {
     if (!token || !currentUserId || !productId) return;
     const checkPurchaseStatus = async () => {
       try {
-        const res = await fetch(
-          `/api/orders/user/${currentUserId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (res.ok) {
-          const orders = await res.json();
-          const bought = orders.some((order) => {
-            const isDelivered = (order.orderStatus || "").toLowerCase() === "delivered";
-            if (!isDelivered) return false;
-            return order.orderDetails.some(
-              (detail) => detail.product?.productId.toString() === productId.toString()
-            );
-          });
-          setHasPurchased(bought);
-        }
-      } catch (error) {
-        console.error(error);
+        const res = await api.get(`/api/orders/user/${currentUserId}`);
+        const orders = res.data;
+        const bought = orders.some((order) => {
+          const isDelivered = (order.orderStatus || "").toLowerCase() === "delivered";
+          if (!isDelivered) return false;
+          return order.orderDetails.some(
+            (detail) => detail.product?.productId.toString() === productId.toString()
+          );
+        });
+        setHasPurchased(bought);
+      } catch (err) {
+        console.error("API Error:", err);
       }
     };
     checkPurchaseStatus();
@@ -306,23 +295,15 @@ export default function ProductDetail() {
     };
 
     try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(orderPayload),
-      });
-
-      if (!res.ok) throw new Error("Thêm thất bại");
+      await api.post("/api/orders", orderPayload);
 
       messageApi.success({
         content: `Đã thêm ${qty} ${selectedProduct.productName} vào giỏ!`,
         icon: <ShoppingCartOutlined style={{ color: "green" }} />,
       });
       refreshCartCount(currentUserId, token);
-    } catch {
+    } catch (err) {
+      console.error("API Error:", err);
       messageApi.error("Không thể thêm vào giỏ hàng. Vui lòng thử lại.");
     }
   };
@@ -375,22 +356,15 @@ export default function ProductDetail() {
         rating: ratingInput,
         comment: commentInput,
       };
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("Gửi đánh giá thất bại");
-      const newReview = await res.json();
+      const res = await api.post("/api/reviews", payload);
+      const newReview = res.data;
       setReviews([newReview, ...reviews]);
       setCommentInput("");
       setRatingInput(5);
       messageApi.success("Cảm ơn bạn đã đánh giá sản phẩm!");
-    } catch (error) {
-      messageApi.error("Lỗi: " + error.message);
+    } catch (err) {
+      console.error("API Error:", err);
+      messageApi.error("Lỗi: " + (err.response?.data?.error || err.message));
     } finally {
       setSubmittingReview(false);
     }
