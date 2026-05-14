@@ -4,7 +4,8 @@ import { message } from "antd";
 import { CheckCircle, XCircle, Loader2, ShieldCheck } from "lucide-react";
 import Cookies from "js-cookie";
 import { AuthContext } from "../../context/AuthContext";
-import { sendInvoiceEmail } from "../EmailService"; 
+import { sendInvoiceEmail } from "../EmailService";
+import api from "../../config/api";
 
 const generateTransactionId = () =>
   "TM" + Math.random().toString(36).substring(2, 12).toUpperCase();
@@ -67,31 +68,14 @@ export default function PaymentReturn() {
         };
 
         // Gọi API tạo đơn hàng
-        let orderRes;
         const apiEndpoint = pendingOrder.oldOrderIds?.length
-          ? "http://localhost:8080/api/orders/replace"
-          : "http://localhost:8080/api/orders";
+          ? "/api/orders/replace"
+          : "/api/orders";
 
-        orderRes = await fetch(apiEndpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(orderPayload),
-        });
-
-        if (!orderRes.ok) {
-          const errText = await orderRes.text();
-          console.error("Order error:", errText);
-          throw new Error("Không thể lưu đơn hàng vào DB");
-        }
-
-        const orderData = await orderRes.json();
+        const { data: orderData } = await api.post(apiEndpoint, orderPayload);
         const createdOrderId = orderData.orderId;
 
         // Gọi API lưu thanh toán
-        // [SỬA ĐỔI] Lấy totalAmount từ pendingOrder (đã trừ voucher ở Checkout)
         const paymentPayload = {
           orderId: createdOrderId,
           paymentMethodId: "PM002",
@@ -100,20 +84,7 @@ export default function PaymentReturn() {
           paymentStatus: "Completed",
         };
 
-        const payRes = await fetch("http://localhost:8080/api/payments", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(paymentPayload),
-        });
-
-        if (!payRes.ok) {
-          const errText = await payRes.text();
-          console.error("Payment error:", errText);
-          throw new Error("Không thể lưu giao dịch Payment!");
-        }
+        await api.post("/api/payments", paymentPayload);
 
         // Xóa session sau khi thành công
         sessionStorage.removeItem("pendingOrder");

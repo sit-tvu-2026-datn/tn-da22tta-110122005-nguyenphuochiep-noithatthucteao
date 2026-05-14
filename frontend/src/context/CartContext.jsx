@@ -1,4 +1,5 @@
 import { createContext, useState } from "react";
+import api from "../config/api";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const CartContext = createContext();
@@ -10,20 +11,8 @@ export const CartProvider = ({ children }) => {
     if (!userId || !token) return;
 
     try {
-      const res = await fetch(
-        `http://localhost:8080/api/cart/count/user/${userId}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!res.ok) throw new Error("Failed to fetch cart count");
-
-      const count = await res.json();      
-      setCartCount(count);
+      const { data } = await api.get(`/api/cart/count/user/${userId}`);
+      setCartCount(data);
     } catch (err) {
       console.error("CartContext error:", err);
     }

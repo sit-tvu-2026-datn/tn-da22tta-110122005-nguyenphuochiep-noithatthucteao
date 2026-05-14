@@ -38,6 +38,7 @@ import {
 import { AuthContext } from "../../context/AuthContext"; 
 import Cookies from "js-cookie";
 import dayjs from "dayjs";
+import api from "../../config/api";
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -79,7 +80,7 @@ export default function FlashSaleManager() {
     setLoading(true);
     try {
       // Gọi API lấy tất cả danh sách cho Admin
-      const res = await fetch("http://localhost:8080/api/flash-sales/all-admin", { 
+      const res = await fetch("/api/flash-sales/all-admin", { 
          headers: { Authorization: `Bearer ${token}` },
       });
       
@@ -88,7 +89,7 @@ export default function FlashSaleManager() {
         setFlashSales(data);
       } else {
          // Fallback nếu chưa có API all-admin thì gọi current
-         const resCurrent = await fetch("http://localhost:8080/api/flash-sales/current", {
+         const resCurrent = await fetch("/api/flash-sales/current", {
             headers: { Authorization: `Bearer ${token}` }
          });
          if (resCurrent.ok) {
@@ -105,7 +106,7 @@ export default function FlashSaleManager() {
 
   const fetchAllProducts = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/products");
+      const res = await fetch("/api/products");
       const data = await res.json();
       setProducts(data);
     } catch (err) {
@@ -115,7 +116,7 @@ export default function FlashSaleManager() {
 
   const fetchSaleItems = async (saleId) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/flash-sales/${saleId}`, {
+      const res = await fetch(`/api/flash-sales/${saleId}`, {
          headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -160,8 +161,8 @@ export default function FlashSaleManager() {
       };
 
       const url = editingSale 
-        ? `http://localhost:8080/api/flash-sales/${editingSale.flashSaleId}` 
-        : "http://localhost:8080/api/flash-sales";
+        ? `/api/flash-sales/${editingSale.flashSaleId}` 
+        : "/api/flash-sales";
         
       const method = editingSale ? "PUT" : "POST";
 
@@ -188,7 +189,7 @@ export default function FlashSaleManager() {
   // --- [NEW] HÀM CẬP NHẬT TRẠNG THÁI ---
   const handleUpdateStatus = async (id, newStatus) => {
       try {
-          const res = await fetch(`http://localhost:8080/api/flash-sales/${id}/status`, {
+          const res = await fetch(`/api/flash-sales/${id}/status`, {
               method: "PUT",
               headers: {
                   "Content-Type": "application/json",
@@ -208,7 +209,7 @@ export default function FlashSaleManager() {
 
   const handleDeleteSale = async (id) => {
     try {
-      await fetch(`http://localhost:8080/api/flash-sales/${id}`, {
+      await fetch(`/api/flash-sales/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -236,7 +237,7 @@ export default function FlashSaleManager() {
          quantity: values.quantity
       };
 
-      const res = await fetch(`http://localhost:8080/api/flash-sales/${currentSaleId}/items`, {
+      const res = await fetch(`/api/flash-sales/${currentSaleId}/items`, {
         method: "POST",
         headers: { 
             "Content-Type": "application/json",

@@ -4,6 +4,7 @@ import { AuthContext } from "../../context/AuthContext";
 import { message, Spin } from "antd";
 import Cookies from "js-cookie";
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, LogIn } from "lucide-react";
+import api from "../../config/api";
 
 export default function Login() {
   const location = useLocation();
@@ -43,15 +44,8 @@ export default function Login() {
 
     try {
       // 1. Gọi API Login
-      const response = await fetch("http://localhost:8080/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const { data } = await api.post("/api/auth/login", { email, password });
 
-      if (!response.ok) throw new Error("Email hoặc mật khẩu không đúng");
-
-      const data = await response.json();
       const token = data.token;
       if (!token) throw new Error("Phản hồi không hợp lệ từ máy chủ");
 
@@ -69,12 +63,12 @@ export default function Login() {
       setIsLoggingIn(true);
       messageApi.success("Đăng nhập thành công!");
 
-      // 4. Lấy thông tin user để kiểm tra Role NGAY LẬP TỨC
+      // 4. Lấy thông tin user để kiểm tra Role NGAY LẬP TẨC
       // Chúng ta fetch trực tiếp ở đây để quyết định hướng đi chính xác
-      const profileRes = await fetch("http://localhost:8080/api/users/profile", {
+      const profileRes = await api.get("/api/users/profile", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const userData = await profileRes.json();
+      const userData = profileRes.data;
       
       // Cập nhật Context
       await login(userData, token);

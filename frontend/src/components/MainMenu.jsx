@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X, ChevronDown, ChevronRight } from "lucide-react";
+import api from "../config/api";
 
 export default function MainMenu() {
   const [categories, setCategories] = useState([]);
@@ -8,9 +9,8 @@ export default function MainMenu() {
   const [mobileSubOpen, setMobileSubOpen] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:8080/api/categories")
-      .then((res) => res.json())
-      .then((data) => setCategories(data))
+    api.get("/api/categories")
+      .then((res) => setCategories(res.data))
       .catch(() => setCategories([]));
   }, []);
 

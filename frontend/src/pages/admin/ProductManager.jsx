@@ -30,6 +30,7 @@ import {
 import { AuthContext } from "../../context/AuthContext";
 import Cookies from "js-cookie";
 import '@google/model-viewer'; // Import model-viewer cho AR Preview
+import api from "../../config/api";
 
 const { Title } = Typography;
 
@@ -67,7 +68,7 @@ export default function ProductManager() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8080/api/products", {
+      const res = await fetch("/api/products", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Fetch failed");
@@ -82,7 +83,7 @@ export default function ProductManager() {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/categories", {
+      const res = await fetch("/api/categories", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error();
@@ -117,7 +118,7 @@ export default function ProductManager() {
     const data = new FormData();
     data.append("file", file);
 
-    const res = await fetch("http://localhost:8080/api/upload/ar", {
+    const res = await fetch("/api/upload/ar", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`
@@ -166,7 +167,7 @@ export default function ProductManager() {
 
   const handleDelete = async (id) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/products/${id}`, {
+      const res = await fetch(`/api/products/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -221,8 +222,8 @@ export default function ProductManager() {
       const payload = { ...values, imageUrls, arLink, arModelUsdz };
       const method = editingProduct ? "PUT" : "POST";
       const url = editingProduct
-        ? `http://localhost:8080/api/products/${editingProduct.productId}`
-        : "http://localhost:8080/api/products";
+        ? `/api/products/${editingProduct.productId}`
+        : "/api/products";
 
       const res = await fetch(url, {
         method,

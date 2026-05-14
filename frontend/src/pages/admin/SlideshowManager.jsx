@@ -3,6 +3,7 @@ import { Table, Input, Button, Space, Modal, Form, message, Popconfirm, Card, Ty
 import { EditOutlined, DeleteOutlined, SearchOutlined, PlusOutlined, ReloadOutlined, ExclamationCircleOutlined, PictureOutlined } from "@ant-design/icons";
 import { AuthContext } from "../../context/AuthContext"; // Đảm bảo đường dẫn đúng
 import Cookies from "js-cookie";
+import api from "../../config/api";
 
 const { Title, Text } = Typography;
 const { confirm } = Modal;
@@ -34,7 +35,7 @@ export default function SlideshowManager() {
     setLoading(true);
     try {
       // Gọi API lấy danh sách cho Admin (bao gồm cả ẩn)
-      const response = await fetch("http://localhost:8080/api/slideshows/admin", {
+      const response = await fetch("/api/slideshows/admin", {
         headers: { Authorization: `Bearer ${token}` },
       });
       
@@ -72,7 +73,7 @@ export default function SlideshowManager() {
   // 3. Hành động Xóa (Đơn lẻ)
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/slideshows/admin/${id}`, {
+      const response = await fetch(`/api/slideshows/admin/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -108,7 +109,7 @@ export default function SlideshowManager() {
     try {
       setLoading(true);
       const deletePromises = selectedRowKeys.map(id =>
-          fetch(`http://localhost:8080/api/slideshows/admin/${id}`, {
+          fetch(`/api/slideshows/admin/${id}`, {
               method: "DELETE",
               headers: { Authorization: `Bearer ${token}` },
           }).then(res => {
@@ -146,8 +147,8 @@ export default function SlideshowManager() {
       
       // Nếu update thì cần ID trên URL, nếu tạo mới thì không
       const url = isUpdate
-        ? `http://localhost:8080/api/slideshows/admin/${editingSlide.id}`
-        : "http://localhost:8080/api/slideshows/admin";
+        ? `/api/slideshows/admin/${editingSlide.id}`
+        : "/api/slideshows/admin";
 
       const response = await fetch(url, {
         method,

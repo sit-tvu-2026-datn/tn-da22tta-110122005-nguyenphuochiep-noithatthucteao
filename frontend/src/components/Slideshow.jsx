@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import api from "../config/api";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
 
@@ -11,15 +12,9 @@ export default function Slideshow() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:8080/api/slideshows/public")
+    api.get("/api/slideshows/public")
       .then((res) => {
-        if (!res.ok) {
-          throw new Error("Lỗi khi tải slideshow");
-        }
-        return res.json();
-      })
-      .then((data) => {
-        setSlides(data);
+        setSlides(res.data);
         setLoading(false);
       })
       .catch((err) => {

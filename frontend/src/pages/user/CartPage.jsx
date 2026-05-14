@@ -14,6 +14,7 @@ import {
   Zap,
 } from "lucide-react";
 import nothingImg from "../../assets/nothing.png";
+import api from "../../config/api";
 
 export default function CartPage() {
   const userId = Cookies.get("user_id");
@@ -35,15 +36,7 @@ export default function CartPage() {
   // 1. Fetch Cart
   const fetchCartItems = async () => {
     try {
-      const res = await fetch(
-        `http://localhost:8080/api/cart/items/${userId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (!res.ok) throw new Error("Failed to fetch cart");
-
-      const data = await res.json();
+      const { data } = await api.get(`/api/cart/items/${userId}`);
       setCartOrders(data);
 
       const initialSelected = {};
@@ -62,15 +55,9 @@ export default function CartPage() {
   // 2. Fetch Flash Sale
   const fetchFlashSale = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/flash-sales/current");
-      if (res.ok) {
-        const text = await res.text();
-        if (text) {
-          const data = JSON.parse(text);
-          if (data && data.status === "Active") {
-            setFlashSale(data);
-          }
-        }
+      const { data } = await api.get("/api/flash-sales/current");
+      if (data && data.status === "Active") {
+        setFlashSale(data);
       }
     } catch (error) {
       console.error("Flash sale fetch error:", error);
@@ -179,11 +166,7 @@ export default function CartPage() {
 
   const handleDeleteItem = async (orderId) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/orders/${orderId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Xóa sản phẩm thất bại");
+      await api.delete(`/api/orders/${orderId}`);
 
       setCartOrders((prev) =>
         prev.filter((order) => order.orderId !== orderId)

@@ -32,12 +32,13 @@ import {
 import { ThunderboltOutlined, FilterOutlined } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import dayjs from "dayjs";
+import api from "../../config/api";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
-const API_BASE_URL = "http://localhost:8080/api/admin/dashboard";
+const API_BASE_URL = "/api/admin/dashboard";
 
 export default function StatsPage() {
   // --- STATE ---

@@ -15,6 +15,7 @@ import {
   Loader2,
   ChevronLeft
 } from "lucide-react";
+import api from "../../../config/api";
 
 export default function EditProfile() {
   const { user, login } = useContext(AuthContext);
@@ -108,7 +109,7 @@ export default function EditProfile() {
     setIsSaving(true);
 
     try {
-      const res = await fetch(`http://localhost:8080/api/users/${user.userId}`, {
+      const res = await fetch(`/api/users/${user.userId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

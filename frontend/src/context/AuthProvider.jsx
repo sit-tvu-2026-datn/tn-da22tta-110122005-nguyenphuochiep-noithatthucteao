@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Cookies from "js-cookie";
 import { AuthContext } from "./AuthContext";
+import api from "../config/api";
 
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -10,12 +11,9 @@ const AuthProvider = ({ children }) => {
     Cookies.set("jwt", token, { expires: 1 / 24, sameSite: "Lax" });
 
     try {
-      const res = await fetch("http://localhost:8080/api/users/profile", {
+      const { data } = await api.get("/api/users/profile", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("Không thể tải thông tin người dùng");
-      
-      const data = await res.json();
       setUser(data);
 
       if (data.userId) {
@@ -50,11 +48,10 @@ const AuthProvider = ({ children }) => {
       return;
     }
 
-    fetch("http://localhost:8080/api/users/profile", {
+    api.get("/api/users/profile", {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data) => setUser(data))
+      .then((res) => setUser(res.data))
       .catch(() => {
         Cookies.remove("jwt");
         setUser(null);

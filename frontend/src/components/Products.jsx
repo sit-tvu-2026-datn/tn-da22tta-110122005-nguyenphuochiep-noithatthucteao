@@ -9,6 +9,7 @@ import { message, Empty, Spin, Drawer } from "antd";
 import { Eye, ShoppingCart, Filter, X, Grid, Zap, Clock } from "lucide-react";
 import Cookies from "js-cookie";
 import { CartContext } from "../context/CartContext.jsx";
+import api from "../config/api";
 
 const FlashSaleTimer = ({ endDate }) => {
   const calculateTimeLeft = () => {
@@ -111,39 +112,24 @@ export default function Products() {
       setLoading(true);
       try {
         const [catRes, fsRes, prodRes] = await Promise.all([
-          fetch("http://localhost:8080/api/categories"),
-          fetch("http://localhost:8080/api/flash-sales/current"),
-          fetch(
-            `http://localhost:8080/api/products${
+          api.get("/api/categories"),
+          api.get("/api/flash-sales/current").catch(() => ({ data: null })),
+          api.get(
+            `/api/products${
               categoryId ? `?categoryId=${categoryId}` : ""
             }`
           ),
         ]);
 
-        if (catRes.ok) {
-          setCategories(await catRes.json());
+        setCategories(catRes.data);
+
+        if (fsRes.data && fsRes.data.status === "Active") {
+          setFlashSale(fsRes.data);
+        } else {
+          setFlashSale(null);
         }
 
-        if (fsRes.ok) {
-          const text = await fsRes.text();
-          if (text) {
-            try {
-              const fsData = JSON.parse(text);
-              if (fsData && fsData.status === "Active") {
-                setFlashSale(fsData);
-              }
-            } catch (e) {
-              console.warn("Lỗi parse JSON Flash Sale:", e);
-            }
-          } else {
-            setFlashSale(null);
-          }
-        }
-
-        if (prodRes.ok) {
-          const prodData = await prodRes.json();
-          setProducts(prodData);
-        }
+        setProducts(prodRes.data);
       } catch (error) {
         console.error("Lỗi tải dữ liệu:", error);
       } finally {
@@ -281,16 +267,7 @@ export default function Products() {
     };
 
     try {
-      const res = await fetch("http://localhost:8080/api/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(orderPayload),
-      });
-
-      if (!res.ok) throw new Error("Thêm thất bại");
+      const { data } = await api.post("/api/orders", orderPayload);
 
       messageApi.success({
         content: `Đã thêm ${product.productName} vào giỏ!`,

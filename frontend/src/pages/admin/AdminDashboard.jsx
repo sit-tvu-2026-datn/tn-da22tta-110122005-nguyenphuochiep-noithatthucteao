@@ -48,6 +48,7 @@ import {
 } from "recharts";
 import Cookies from "js-cookie";
 import dayjs from "dayjs";
+import api from "../../config/api";
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -113,7 +114,7 @@ export default function AdminDashboard() {
     dayjs(),
   ]);
 
-  const BASE_URL = "http://localhost:8080/api/admin/dashboard";
+  const BASE_URL = "/api/admin/dashboard";
   const headers = { Authorization: `Bearer ${token}` };
 
   // --- 1. API CALL RIÊNG CHO STATUS (Dùng useCallback để tránh re-render) ---

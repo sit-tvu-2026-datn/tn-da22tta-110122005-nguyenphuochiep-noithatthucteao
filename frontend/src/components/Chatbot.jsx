@@ -10,9 +10,7 @@ import {
   RefreshCw,
   Armchair,
 } from "lucide-react";
-
-// Thay đổi URL này thành URL thật của backend bạn
-const API_URL = "http://localhost:8080/api/chatbot/ask";
+import api from "../config/api";
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -86,18 +84,11 @@ export default function Chatbot() {
     }));
 
     try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: apiMsg,
-          history: historyPayload, // Gửi kèm lịch sử
-        }),
+      const { data } = await api.post("/api/chatbot/ask", {
+        message: apiMsg,
+        history: historyPayload, // Gửi kèm lịch sử
       });
 
-      if (!response.ok) throw new Error("Lỗi kết nối server");
-
-      const data = await response.json();
       setMessages((prev) => [
         ...prev,
         { id: Date.now() + 1, text: data.reply, sender: "bot" },

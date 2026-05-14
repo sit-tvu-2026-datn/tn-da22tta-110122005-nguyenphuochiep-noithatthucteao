@@ -29,6 +29,7 @@ import {
 } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { AuthContext } from "../../context/AuthContext";
+import api from "../../config/api";
 
 const { Title, Text } = Typography;
 
@@ -189,7 +190,7 @@ export default function OrderManager() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8080/api/orders", {
+      const res = await fetch("/api/orders", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error();
@@ -206,7 +207,7 @@ export default function OrderManager() {
     try {
       setLoading(true);
       const res = await fetch(
-        `http://localhost:8080/api/orders/${orderId}/status`,
+        `/api/orders/${orderId}/status`,
         {
           method: "PUT",
           headers: { Authorization: `Bearer ${token}` },
@@ -230,7 +231,7 @@ export default function OrderManager() {
   const updatePaymentStatus = async (paymentId, newStatus) => {
     try {
       const res = await fetch(
-        `http://localhost:8080/api/payments/${paymentId}/status`,
+        `/api/payments/${paymentId}/status`,
         {
           method: "PUT",
           headers: {

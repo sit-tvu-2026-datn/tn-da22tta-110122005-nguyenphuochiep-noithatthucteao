@@ -22,6 +22,7 @@ import {
 } from "@ant-design/icons";
 import { AuthContext } from "../../context/AuthContext";
 import Cookies from "js-cookie";
+import api from "../../config/api";
 
 const { Title, Text } = Typography;
 
@@ -51,7 +52,7 @@ export default function PaymentMethodManager() {
   const fetchPaymentMethods = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:8080/api/payment-methods", {
+      const response = await fetch("/api/payment-methods", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -85,7 +86,7 @@ export default function PaymentMethodManager() {
 
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/payment-methods/${id}`, {
+      const response = await fetch(`/api/payment-methods/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -108,7 +109,7 @@ export default function PaymentMethodManager() {
   const handleConfirmDelete = async () => {
     try {
       for (const id of selectedRowKeys) {
-        await fetch(`http://localhost:8080/api/payment-methods/${id}`, {
+        await fetch(`/api/payment-methods/${id}`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -128,8 +129,8 @@ export default function PaymentMethodManager() {
 
       const method = editingMethod ? "PUT" : "POST";
       const url = editingMethod
-        ? `http://localhost:8080/api/payment-methods/${editingMethod.id}`
-        : "http://localhost:8080/api/payment-methods";
+        ? `/api/payment-methods/${editingMethod.id}`
+        : "/api/payment-methods";
 
       const payload = editingMethod
         ? { id: editingMethod.id, name: values.name }

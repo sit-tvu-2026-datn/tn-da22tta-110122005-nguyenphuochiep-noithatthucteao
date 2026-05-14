@@ -9,7 +9,7 @@ import {
   ShoppingBag,
   CalendarDays,
 } from "lucide-react";
-import Cookies from "js-cookie";
+import api from "../config/api";
 
 // Helper format tiền tệ
 const formatCurrency = (amount) => {
@@ -36,7 +36,6 @@ export default function PromotionsPage() {
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [messageApi, contextHolder] = message.useMessage();
-  const token = Cookies.get("jwt");
 
   useEffect(() => {
     fetchCoupons();
@@ -44,18 +43,7 @@ export default function PromotionsPage() {
 
   const fetchCoupons = async () => {
     try {
-      // Gọi API lấy tất cả active coupons
-      // Giả sử backend có endpoint này, nếu không bạn dùng endpoint search/filter
-      const res = await fetch("http://localhost:8080/api/coupons/active", {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // Bỏ comment nếu API yêu cầu login
-        },
-      });
-      
-      if (!res.ok) throw new Error("Không thể tải danh sách mã giảm giá");
-      
-      const data = await res.json();
+      const { data } = await api.get("/api/coupons/active");
       setCoupons(data);
     } catch (error) {
       console.error(error);

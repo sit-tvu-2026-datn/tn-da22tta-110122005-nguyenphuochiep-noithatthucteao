@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { message } from "antd";
+import api from "../../config/api";
 
 // --- ICONS (SVG) ---
 const UserIcon = () => (
@@ -192,15 +193,9 @@ export default function Register() {
         avatar: avatarUrl,
       };
 
-      const res = await fetch("http://localhost:8080/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const { data } = await api.post("/api/auth/register", payload);
 
-      const data = await res.json();
-
-      if (res.ok && data.message) {
+      if (data.message) {
         messageApi.success("Đăng ký thành công!");
         setTimeout(() => {
           navigate("/login", {
@@ -221,7 +216,11 @@ export default function Register() {
       }
     } catch (error) {
       console.error("Lỗi khi đăng ký:", error);
-      messageApi.error("Không thể kết nối đến máy chủ!");
+      if (error.response?.data?.error?.includes("exists")) {
+        messageApi.error("Email đã được sử dụng, vui lòng chọn email khác!");
+      } else {
+        messageApi.error("Không thể kết nối đến máy chủ!");
+      }
     } finally {
       setLoading(false);
     }

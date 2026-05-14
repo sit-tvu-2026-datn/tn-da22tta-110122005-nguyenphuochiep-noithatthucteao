@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Cookies from "js-cookie";
 import { AuthContext } from "../../context/AuthContext"; // [UPDATE] Import AuthContext
+import api from "../../config/api";
 
 // --- HÀM KIỂM TRA HẠN SỬ DỤNG ---
 const isCouponExpired = (endDate) => {
@@ -124,21 +125,15 @@ export default function Checkout() {
 
   // Fetch Payment Methods
   useEffect(() => {
-    fetch("http://localhost:8080/api/payment-methods", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then(setPaymentMethods)
+    api.get("/api/payment-methods")
+      .then((res) => setPaymentMethods(res.data))
       .catch(() => messageApi.error("Không thể tải phương thức thanh toán"));
   }, [token]);
 
   // Fetch Coupons
   useEffect(() => {
-    fetch("http://localhost:8080/api/coupons/active", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then(setCoupons)
+    api.get("/api/coupons/active")
+      .then((res) => setCoupons(res.data))
       .catch(() => messageApi.error("Không thể tải danh sách voucher"));
   }, []);
 
@@ -251,21 +246,10 @@ export default function Checkout() {
     // LUỒNG THANH TOÁN VNPAY (PM002)
     if (paymentMethod === "PM002") {
       try {
-        const vnpRes = await fetch(
-          "http://localhost:8080/api/vnpay/create-payment",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              amount: Math.round(totalPriceWithCoupon),
-              language: "vn",
-            }),
-          }
-        );
-        const vnpData = await vnpRes.json();
+        const { data: vnpData } = await api.post("/api/vnpay/create-payment", {
+          amount: Math.round(totalPriceWithCoupon),
+          language: "vn",
+        });
         if (vnpData.code === "00") {
           // Lưu lại order payload để xử lý sau khi VNPAY redirect về
           sessionStorage.setItem("pendingOrder", JSON.stringify(orderPayload));
@@ -282,40 +266,22 @@ export default function Checkout() {
       const apiPath = oldOrderIds?.length
         ? "/api/orders/replace"
         : "/api/orders";
-      const res = await fetch(`http://localhost:8080${apiPath}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(orderPayload),
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-
-      const orderData = await res.json();
+      const { data: orderData } = await api.post(apiPath, orderPayload);
 
       // Tạo Payment record trạng thái Pending
-      await fetch("http://localhost:8080/api/payments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          orderId: orderData.orderId,
-          paymentMethodId: paymentMethod,
-          transactionId: "COD-" + Date.now(),
-          amount: totalPriceWithCoupon,
-          paymentStatus: "Pending",
-        }),
+      await api.post("/api/payments", {
+        orderId: orderData.orderId,
+        paymentMethodId: paymentMethod,
+        transactionId: "COD-" + Date.now(),
+        amount: totalPriceWithCoupon,
+        paymentStatus: "Pending",
       });
 
       messageApi.success("Đặt hàng thành công!");
       sessionStorage.removeItem("pendingOrder");
       setTimeout(() => navigate("/purchase"), 1500);
     } catch (err) {
-      messageApi.error("Lỗi: " + err.message);
+      messageApi.error("Lỗi: " + (err.response?.data || err.message));
     }
   };
 

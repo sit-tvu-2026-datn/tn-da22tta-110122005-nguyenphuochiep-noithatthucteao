@@ -31,6 +31,7 @@ import {
 import { AuthContext } from "../../context/AuthContext"; // Giả sử đường dẫn đúng
 import Cookies from "js-cookie";
 import dayjs from "dayjs";
+import api from "../../config/api";
 
 const { Title, Text } = Typography;
 
@@ -65,7 +66,7 @@ export default function CouponManager() {
   const fetchCoupons = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:8080/api/coupons", {
+      const response = await fetch("/api/coupons", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -124,8 +125,8 @@ export default function CouponManager() {
       };
 
       const url = editingCoupon
-        ? `http://localhost:8080/api/coupons/${editingCoupon.couponId}`
-        : "http://localhost:8080/api/coupons";
+        ? `/api/coupons/${editingCoupon.couponId}`
+        : "/api/coupons";
 
       const method = editingCoupon ? "PUT" : "POST";
 
@@ -152,7 +153,7 @@ export default function CouponManager() {
 
   const handleDelete = async (id) => {
     try {
-      await fetch(`http://localhost:8080/api/coupons/${id}`, {
+      await fetch(`/api/coupons/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -171,7 +172,7 @@ export default function CouponManager() {
   const handleConfirmDelete = async () => {
     try {
       for (const id of selectedRowKeys) {
-        await fetch(`http://localhost:8080/api/coupons/${id}`, {
+        await fetch(`/api/coupons/${id}`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -187,7 +188,7 @@ export default function CouponManager() {
 
   const toggleStatus = async (id, currentStatus) => {
     try {
-      await fetch(`http://localhost:8080/api/coupons/${id}/status`, {
+      await fetch(`/api/coupons/${id}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -14,6 +14,7 @@ import {
   MapPin, // Icon địa chỉ
   CreditCard, // Icon thanh toán
 } from "lucide-react";
+import api from "../../config/api";
 
 export default function Purchase() {
   const [orders, setOrders] = useState([]);
@@ -94,14 +95,7 @@ export default function Purchase() {
 
       if (!token || !userId) return;
 
-      const res = await fetch(
-        `http://localhost:8080/api/orders/user/${userId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (!res.ok) throw new Error("Không thể tải danh sách đơn hàng");
-
-      const data = await res.json();
+      const { data } = await api.get(`/api/orders/user/${userId}`);
       console.log(data)
       const sortedData = data
         .filter((item) => item.isOrder === true)
@@ -154,24 +148,10 @@ export default function Purchase() {
       onOk: async () => {
         try {
           const token = Cookies.get("jwt");
-          const res = await fetch(
-            `http://localhost:8080/api/orders/${order.orderId}/cancel`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                reason: cancelReasonRef.current || "Khách hàng hủy",
-              }),
-            }
+          const { data } = await api.post(
+            `/api/orders/${order.orderId}/cancel`,
+            { reason: cancelReasonRef.current || "Khách hàng hủy" }
           );
-
-          if (!res.ok) {
-            const errData = await res.json();
-            throw new Error(errData.message || "Hủy đơn thất bại");
-          }
 
           messageApi.success(
             isPrepaid

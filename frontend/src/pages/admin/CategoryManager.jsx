@@ -3,6 +3,7 @@ import { Table, Input, Button, Space, Modal, Form, message, Popconfirm, Card, Ty
 import { EditOutlined, DeleteOutlined, SearchOutlined, PlusOutlined, ReloadOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import { AuthContext } from "../../context/AuthContext";
 import Cookies from "js-cookie";
+import api from "../../config/api";
 
 const { Title, Text } = Typography;
 const { confirm } = Modal;
@@ -33,7 +34,7 @@ export default function CategoryManager() {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:8080/api/categories", {
+      const response = await fetch("/api/categories", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.status === 401 || response.status === 403) {
@@ -65,7 +66,7 @@ export default function CategoryManager() {
 
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/categories/${id}`, {
+      const response = await fetch(`/api/categories/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -99,7 +100,7 @@ export default function CategoryManager() {
     try {
       setLoading(true);
       const deletePromises = selectedRowKeys.map(id =>
-          fetch(`http://localhost:8080/api/categories/${id}`, {
+          fetch(`/api/categories/${id}`, {
               method: "DELETE",
               headers: { Authorization: `Bearer ${token}` },
           }).then(res => {
@@ -134,8 +135,8 @@ export default function CategoryManager() {
       setLoading(true);
       const method = editingCategory ? "PUT" : "POST";
       const url = editingCategory
-        ? `http://localhost:8080/api/categories/${editingCategory.categoryId}`
-        : "http://localhost:8080/api/categories";
+        ? `/api/categories/${editingCategory.categoryId}`
+        : "/api/categories";
 
       const response = await fetch(url, {
         method,

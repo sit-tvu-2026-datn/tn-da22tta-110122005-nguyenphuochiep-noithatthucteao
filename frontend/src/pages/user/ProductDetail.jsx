@@ -11,6 +11,7 @@ import { Eye, Clock, Zap, Box, Image as ImageIcon } from "lucide-react";
 import Cookies from "js-cookie";
 import { CartContext } from "../../context/CartContext";
 import "@google/model-viewer"; // [NEW] Import trực tiếp thư viện 3D/AR
+import api from "../../config/api";
 
 // --- COMPONENT TIMER ---
 const FlashSaleTimer = ({ endDate }) => {
@@ -91,7 +92,7 @@ export default function ProductDetail() {
   useEffect(() => {
     const fetchFlashSale = async () => {
       try {
-        const res = await fetch("http://localhost:8080/api/flash-sales/current");
+        const res = await fetch("/api/flash-sales/current");
         if (res.ok) {
           const text = await res.text();
           if (text) {
@@ -113,7 +114,7 @@ export default function ProductDetail() {
     const fetchProduct = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`http://localhost:8080/api/products/${productId}`);
+        const res = await fetch(`/api/products/${productId}`);
         if (!res.ok) throw new Error("Không thể tải sản phẩm");
         const data = await res.json();
         setProduct(data);
@@ -167,7 +168,7 @@ export default function ProductDetail() {
     if (!productId) return;
     const fetchRelated = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/products/${productId}/related`);
+        const res = await fetch(`/api/products/${productId}/related`);
         if (res.ok) setRelatedProducts(await res.json());
       } catch (err) {
         console.error(err);
@@ -177,7 +178,7 @@ export default function ProductDetail() {
 
     const fetchReviews = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/reviews/product/${productId}`);
+        const res = await fetch(`/api/reviews/product/${productId}`);
         if (res.ok) setReviews((await res.json()).reverse());
       } catch (error) {
         console.error(error);
@@ -191,7 +192,7 @@ export default function ProductDetail() {
     const checkPurchaseStatus = async () => {
       try {
         const res = await fetch(
-          `http://localhost:8080/api/orders/user/${currentUserId}`,
+          `/api/orders/user/${currentUserId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.ok) {
@@ -305,7 +306,7 @@ export default function ProductDetail() {
     };
 
     try {
-      const res = await fetch("http://localhost:8080/api/orders", {
+      const res = await fetch("/api/orders", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -374,7 +375,7 @@ export default function ProductDetail() {
         rating: ratingInput,
         comment: commentInput,
       };
-      const res = await fetch("http://localhost:8080/api/reviews", {
+      const res = await fetch("/api/reviews", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

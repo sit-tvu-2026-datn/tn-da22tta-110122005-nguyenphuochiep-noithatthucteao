@@ -4,6 +4,7 @@ import { EditOutlined, DeleteOutlined, SearchOutlined, PlusOutlined, UserOutline
 import { AuthContext } from "../../context/AuthContext";
 import Cookies from "js-cookie";
 import dayjs from "dayjs";
+import api from "../../config/api";
 
 const { Title, Text } = Typography;
 
@@ -33,7 +34,7 @@ export default function UserManager() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:8080/api/users", {
+      const response = await fetch("/api/users", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.status === 401 || response.status === 403) {
@@ -68,7 +69,7 @@ export default function UserManager() {
 
   const handleDelete = async (userId) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/users/${userId}`, {
+      const response = await fetch(`/api/users/${userId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -88,7 +89,7 @@ export default function UserManager() {
   const handleConfirmDelete = async () => {
     try {
       for (const id of selectedRowKeys) {
-        await fetch(`http://localhost:8080/api/users/${id}`, {
+        await fetch(`/api/users/${id}`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -110,8 +111,8 @@ export default function UserManager() {
       }
       const method = editingUser ? "PUT" : "POST";
       const url = editingUser
-        ? `http://localhost:8080/api/users/${editingUser.userId}`
-        : "http://localhost:8080/api/auth/register";
+        ? `/api/users/${editingUser.userId}`
+        : "/api/auth/register";
 
       const response = await fetch(url, {
         method,
