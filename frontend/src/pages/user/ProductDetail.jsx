@@ -56,6 +56,65 @@ const FlashSaleTimer = ({ endDate }) => {
   );
 };
 
+// --- AR SUPPORT NOTICE ---
+// Detects whether the current device/browser can activate AR
+// and shows a helpful message on desktop / unsupported browsers
+const ArSupportNotice = () => {
+  const [arSupported, setArSupported] = useState(null); // null = checking, true/false = result
+
+  useEffect(() => {
+    // model-viewer exposes canActivateAR after the element loads
+    const checkAR = () => {
+      const mv = document.querySelector("model-viewer");
+      if (mv) {
+        // model-viewer might not have finished loading yet
+        if (mv.loaded) {
+          setArSupported(mv.canActivateAR);
+        } else {
+          mv.addEventListener("load", () => {
+            setArSupported(mv.canActivateAR);
+          }, { once: true });
+        }
+      } else {
+        setArSupported(false);
+      }
+    };
+    // Small delay to ensure model-viewer is in the DOM
+    const timer = setTimeout(checkAR, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Don't show anything while checking or if AR is supported
+  if (arSupported === null || arSupported === true) return null;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: "12px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 20,
+        backgroundColor: "rgba(0,0,0,0.75)",
+        color: "white",
+        padding: "10px 20px",
+        borderRadius: "12px",
+        fontSize: "13px",
+        textAlign: "center",
+        maxWidth: "90%",
+        backdropFilter: "blur(8px)",
+        lineHeight: 1.5,
+      }}
+    >
+      📱 Tính năng AR chỉ hoạt động trên <strong>điện thoại</strong> (Android/iOS).
+      <br />
+      <span style={{ opacity: 0.7, fontSize: "11px" }}>
+        Mở trang này trên thiết bị di động để trải nghiệm "Ướm thử vào không gian".
+      </span>
+    </div>
+  );
+};
+
 export default function ProductDetail() {
   const { productId } = useParams();
   const navigate = useNavigate();
@@ -534,7 +593,7 @@ export default function ProductDetail() {
             <div className="relative flex flex-col gap-4">
 
               {/* Main Stage (Hình ảnh hoặc 3D) */}
-              <div className="relative w-full aspect-square bg-gray-50 rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+              <div className={`relative w-full aspect-square bg-gray-50 rounded-2xl border border-gray-100 shadow-sm ${activeMediaTab === "ar" ? "" : "overflow-hidden"}`}>
 
                 {/* Hết hàng Overlay */}
                 {isOutOfStock && (
@@ -574,25 +633,75 @@ export default function ProductDetail() {
 
                 {/* Nội dung Media */}
                 {activeMediaTab === "ar" ? (
-                  <div className="absolute inset-0 z-10 w-full h-full bg-white">
+                  <div className="absolute inset-0 z-10 w-full h-full bg-white" style={{ overflow: "visible" }}>
                     <model-viewer
                       src={product.arModelGltf || product.arLink}
                       ios-src={product.arModelUsdz}
                       ar
-                      ar-modes="webxr scene-viewer quick-look"
+                      ar-modes="scene-viewer quick-look webxr"
+                      ar-scale="auto"
                       camera-controls
                       auto-rotate
                       shadow-intensity="1"
                       alt={product.productName}
-                      style={{ width: "100%", height: "100%" }}
+                      style={{ width: "100%", height: "100%", position: "relative", zIndex: 10 }}
+                      ref={(el) => {
+                        if (el && !el._arListenerAttached) {
+                          el._arListenerAttached = true;
+                          el.addEventListener("ar-status", (e) => {
+                            console.log("[AR Debug] ar-status:", e.detail.status);
+                          });
+                          el.addEventListener("ar-tracking", (e) => {
+                            console.log("[AR Debug] ar-tracking:", e.detail.status);
+                          });
+                          // Check AR support after model-viewer initializes
+                          setTimeout(() => {
+                            console.log("[AR Debug] canActivateAR:", el.canActivateAR);
+                            console.log("[AR Debug] Protocol:", window.location.protocol);
+                            console.log("[AR Debug] userAgent:", navigator.userAgent);
+                          }, 1000);
+                        }
+                      }}
                     >
+                      {/* AR Button - uses 'class' (NOT className) for Web Component slot compatibility */}
                       <button
                         slot="ar-button"
-                        className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#1c1d21] hover:bg-black text-white font-bold px-6 py-3 rounded-full shadow-xl flex items-center gap-2 border-none cursor-pointer transition-colors whitespace-nowrap z-50"
+                        class="ar-button-custom"
+                        style={{
+                          position: "absolute",
+                          bottom: "24px",
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          backgroundColor: "#1c1d21",
+                          color: "white",
+                          fontWeight: "bold",
+                          fontSize: "14px",
+                          padding: "12px 24px",
+                          borderRadius: "9999px",
+                          boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          border: "none",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                          zIndex: 99,
+                          transition: "background-color 0.2s",
+                        }}
                       >
-                        <Eye size={20} /> Ướm thử vào không gian
+                        📱 Ướm thử vào không gian
                       </button>
+
+                      {/* Fallback message when AR is not supported (desktop / non-AR browser) */}
+                      <div
+                        slot="ar-button"
+                        id="ar-failure"
+                        style={{ display: "none" }}
+                      ></div>
                     </model-viewer>
+
+                    {/* AR Not Supported Fallback (shown on desktop/non-AR devices) */}
+                    <ArSupportNotice />
                   </div>
                 ) : (
                   <div className="absolute inset-0 z-10 bg-white">
