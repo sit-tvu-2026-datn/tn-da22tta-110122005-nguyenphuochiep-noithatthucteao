@@ -152,14 +152,14 @@ function getProductPriceInfo(product, flashSale) {
 
 function ProductDetailSkeleton() {
   return (
-    <main className="min-h-screen bg-[#f8f6f2] px-5 py-10">
+    <main className="min-h-screen bg-white px-5 py-10">
       <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="aspect-[4/5] animate-pulse rounded-[2rem] bg-[#ebe4d9]" />
+        <div className="aspect-[4/5] animate-pulse rounded-[2rem] bg-white" />
         <div className="space-y-6 pt-8">
-          <div className="h-4 w-32 animate-pulse rounded-full bg-[#d9cfbf]" />
-          <div className="h-16 w-4/5 animate-pulse rounded-2xl bg-[#e7ded1]" />
-          <div className="h-6 w-48 animate-pulse rounded-full bg-[#d9cfbf]" />
-          <div className="h-28 animate-pulse rounded-3xl bg-[#ece5dc]" />
+          <div className="h-4 w-32 animate-pulse rounded-full bg-white" />
+          <div className="h-16 w-4/5 animate-pulse rounded-2xl bg-white" />
+          <div className="h-6 w-48 animate-pulse rounded-full bg-white" />
+          <div className="h-28 animate-pulse rounded-3xl bg-white" />
         </div>
       </div>
     </main>
@@ -234,11 +234,11 @@ function QuantitySelector({ value, max, allowPreorder, onChange }) {
   };
 
   return (
-    <div className="inline-flex h-12 items-center overflow-hidden rounded-full border border-[#d7ccbc] bg-[#fbfaf7]">
+    <div className="inline-flex h-12 items-center overflow-hidden rounded-full border border-[#d7ccbc] bg-white">
       <button
         type="button"
         onClick={() => onChange(Math.max(1, value - 1))}
-        className="flex h-full w-12 items-center justify-center text-[#3a3935] transition hover:bg-[#eee5d8]"
+        className="flex h-full w-12 items-center justify-center text-[#3a3935] transition hover:bg-white"
         aria-label="Giảm số lượng"
       >
         <Minus size={16} />
@@ -256,7 +256,7 @@ function QuantitySelector({ value, max, allowPreorder, onChange }) {
       <button
         type="button"
         onClick={increment}
-        className="flex h-full w-12 items-center justify-center text-[#3a3935] transition hover:bg-[#eee5d8]"
+        className="flex h-full w-12 items-center justify-center text-[#3a3935] transition hover:bg-white"
         aria-label="Tăng số lượng"
       >
         <Plus size={16} />
@@ -296,7 +296,7 @@ function ProductGallery({
                 setActiveImageIndex(index);
                 setActiveMedia("image");
               }}
-              className={`h-20 w-20 flex-none overflow-hidden rounded-2xl border bg-[#ede6da] transition lg:h-24 lg:w-24 ${
+              className={`h-20 w-20 flex-none overflow-hidden rounded-2xl border bg-white transition lg:h-24 lg:w-24 ${
                 activeMedia === "image" && activeImageIndex === index
                   ? "border-[#2a2925] shadow-[0_18px_40px_rgba(52,43,32,0.18)]"
                   : "border-transparent opacity-70 hover:opacity-100"
@@ -323,7 +323,7 @@ function ProductGallery({
           )}
         </div>
 
-        <div className="order-1 overflow-hidden rounded-[2rem] border border-white/70 bg-[#ede6da] shadow-[0_32px_90px_rgba(74,58,39,0.18)] lg:order-2">
+        <div className="order-1 overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-[0_32px_90px_rgba(74,58,39,0.18)] lg:order-2">
           <div className="relative aspect-[4/5] min-h-[440px]">
             <div className="absolute left-5 top-5 z-20 flex gap-2">
               {discountPercent > 0 && !isOutOfStock && (
@@ -332,7 +332,7 @@ function ProductGallery({
                 </span>
               )}
               {isOutOfStock && (
-                <span className="rounded-full bg-[#f8f6f2]/90 px-4 py-2 text-xs font-medium uppercase tracking-[0.24em] text-[#26231f]">
+                <span className="rounded-full bg-white/90 px-4 py-2 text-xs font-medium uppercase tracking-[0.24em] text-[#26231f]">
                   Hết hàng
                 </span>
               )}
@@ -346,7 +346,7 @@ function ProductGallery({
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.55, ease: LUXURY_EASE }}
-                  className="absolute inset-0 bg-[#f3eee5]"
+                  className="absolute inset-0 bg-white"
                 >
                   <model-viewer
                     src={product.arModelGltf || product.arLink}
@@ -617,9 +617,9 @@ function ProductTabs({ product, activeTab, setActiveTab, reviews, averageRating,
                   <div className="mt-8">
                     <p className="mb-3 text-sm uppercase tracking-[0.22em] text-[#8a7f70]">Đánh giá của bạn</p>
                     {!token ? (
-                      <p className="rounded-2xl bg-[#eee5d8] p-4 text-sm text-[#62594f]">Vui lòng đăng nhập để viết đánh giá.</p>
+                      <p className="rounded-2xl bg-white p-4 text-sm text-[#62594f]">Vui lòng đăng nhập để viết đánh giá.</p>
                     ) : !hasPurchased ? (
-                      <p className="rounded-2xl bg-[#eee5d8] p-4 text-sm text-[#62594f]">Bạn có thể đánh giá sau khi đơn hàng được giao thành công.</p>
+                      <p className="rounded-2xl bg-white p-4 text-sm text-[#62594f]">Bạn có thể đánh giá sau khi đơn hàng được giao thành công.</p>
                     ) : (
                       <div className="space-y-4">
                         <StarRating value={reviewForm.rating} size={22} interactive onChange={(rating) => onReviewChange("rating", rating)} />
@@ -627,7 +627,7 @@ function ProductTabs({ product, activeTab, setActiveTab, reviews, averageRating,
                           value={reviewForm.comment}
                           onChange={(event) => onReviewChange("comment", event.target.value)}
                           rows={5}
-                          className="w-full resize-none rounded-2xl border border-[#d8cebf] bg-[#fbfaf7] p-4 text-sm text-[#2f2d29] outline-none transition focus:border-[#9a7d46]"
+                          className="w-full resize-none rounded-2xl border border-[#d8cebf] bg-white p-4 text-sm text-[#2f2d29] outline-none transition focus:border-[#9a7d46]"
                           placeholder="Chia sẻ cảm nhận của bạn về sản phẩm..."
                         />
                         <button
@@ -712,7 +712,7 @@ function RelatedProducts({ products, onAddToCart }) {
               className="group overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/48 shadow-[0_18px_60px_rgba(74,58,39,0.08)] transition"
             >
               <Link to={`/product/${product.productId}`} className="block">
-                <div className="relative aspect-[4/5] overflow-hidden bg-[#ede6da]">
+                <div className="relative aspect-[4/5] overflow-hidden bg-white">
                   <img src={image} alt={product.productName} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/28 via-transparent to-transparent opacity-0 transition duration-500 group-hover:opacity-100" />
                 </div>
@@ -752,7 +752,7 @@ function MobilePurchaseBar({ product, price, quantity, setQuantity, max, allowPr
       initial={{ y: 120, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.55, ease: LUXURY_EASE }}
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-white/60 bg-[#f8f6f2]/92 px-4 py-3 shadow-[0_-18px_50px_rgba(54,43,29,0.16)] backdrop-blur-xl lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-white/60 bg-white/92 px-4 py-3 shadow-[0_-18px_50px_rgba(54,43,29,0.16)] backdrop-blur-xl lg:hidden"
     >
       <div className="mx-auto flex max-w-xl items-center gap-3">
         <div className="min-w-0 flex-1">
@@ -1018,7 +1018,7 @@ export default function ProductDetail() {
 
   if (!product) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-[#f8f6f2] px-5 text-center">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-white px-5 text-center">
         <p className="text-2xl font-light text-[#23231f]">Không tìm thấy sản phẩm.</p>
         <button onClick={() => navigate("/")} className="mt-6 rounded-full bg-[#23231f] px-7 py-3 text-sm uppercase tracking-[0.18em] text-[#f8f6f2]">
           Về trang chủ
@@ -1028,11 +1028,11 @@ export default function ProductDetail() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f8f6f2] text-[#24231f]">
+    <main className="min-h-screen overflow-hidden bg-white text-[#24231f]">
       <Toast toast={toast} onClose={() => setToast(null)} />
 
       <section className="relative">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[560px] bg-[radial-gradient(circle_at_20%_0%,rgba(196,170,117,0.22),transparent_35%),linear-gradient(180deg,#efe7dc_0%,rgba(248,246,242,0)_88%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[560px]" />
         <div className="relative mx-auto max-w-7xl px-5 pb-10 pt-8 sm:px-8 lg:pb-20">
           <motion.button
             type="button"
