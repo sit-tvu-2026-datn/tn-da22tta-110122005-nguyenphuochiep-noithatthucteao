@@ -17,6 +17,7 @@ import {
   Typography,
   Image,
   Tooltip,
+  Progress,
 } from "antd";
 import {
   EditOutlined,
@@ -33,6 +34,8 @@ import '@google/model-viewer'; // Import model-viewer cho AR Preview
 import api from "../../config/api";
 
 const { Title } = Typography;
+const GLB_UPLOAD_ENDPOINT = "/api/upload/models/glb";
+const MAX_GLB_SIZE_MB = 100;
 
 export default function ProductManager() {
   const [products, setProducts] = useState([]);
@@ -48,6 +51,9 @@ export default function ProductManager() {
   const [fileList, setFileList] = useState([]); // Chứa nhiều ảnh
   const [arGltfFileList, setArGltfFileList] = useState([]); // Chứa AR Model .glb
   const [arUsdzFileList, setArUsdzFileList] = useState([]); // Chứa AR Model .usdz
+  const [saving, setSaving] = useState(false);
+  const [glbUploading, setGlbUploading] = useState(false);
+  const [glbUploadProgress, setGlbUploadProgress] = useState(0);
 
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
@@ -104,6 +110,74 @@ export default function ProductManager() {
     }
   };
 
+  const getUploadErrorMessage = (err, fallback) => {
+    return err?.response?.data?.message || err?.response?.data?.error || fallback;
+  };
+
+  const uploadGlbModelToBackend = async (file) => {
+    const data = new FormData();
+    data.append("file", file);
+
+    setGlbUploading(true);
+    setGlbUploadProgress(0);
+
+    try {
+      const res = await api.post(GLB_UPLOAD_ENDPOINT, data, {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (event) => {
+          if (!event.total) return;
+          setGlbUploadProgress(Math.round((event.loaded * 100) / event.total));
+        },
+      });
+
+      if (!res.data?.url) {
+        throw new Error("Backend did not return a model URL");
+      }
+
+      setGlbUploadProgress(100);
+      return res.data.url;
+    } catch (err) {
+      console.error("GLB Upload Error:", err);
+      throw new Error(getUploadErrorMessage(err, "3D model upload failed"));
+    } finally {
+      setGlbUploading(false);
+    }
+  };
+
+  const handleGlbBeforeUpload = (file) => {
+    const isGlb = file.name?.toLowerCase().endsWith(".glb");
+    if (!isGlb) {
+      messageApi.error("Only .glb files are supported for web/Android AR");
+      return Upload.LIST_IGNORE;
+    }
+
+    const isWithinSizeLimit = file.size <= MAX_GLB_SIZE_MB * 1024 * 1024;
+    if (!isWithinSizeLimit) {
+      messageApi.error(`.glb file must be ${MAX_GLB_SIZE_MB}MB or smaller`);
+      return Upload.LIST_IGNORE;
+    }
+
+    setGlbUploadProgress(0);
+    setArGltfFileList([{
+      uid: file.uid,
+      name: file.name,
+      status: "done",
+      url: URL.createObjectURL(file),
+      originFileObj: file,
+    }]);
+    return false;
+  };
+
+  const handleGlbRemove = () => {
+    if (saving || glbUploading) {
+      return false;
+    }
+
+    setGlbUploadProgress(0);
+    setArGltfFileList([]);
+    return true;
+  };
+
   const uploadArFileToBackend = async (file) => {
     const data = new FormData();
     data.append("file", file);
@@ -126,12 +200,14 @@ export default function ProductManager() {
     setFileList([]);
     setArGltfFileList([]);
     setArUsdzFileList([]);
+    setGlbUploadProgress(0);
     setIsModalOpen(true);
   };
 
   const handleEdit = (record) => {
     setEditingProduct(record);
     form.setFieldsValue(record);
+    setGlbUploadProgress(0);
     
     if (record.imageUrls && record.imageUrls.length > 0) {
       setFileList(record.imageUrls.map((url, i) => ({
@@ -164,6 +240,9 @@ export default function ProductManager() {
   };
 
   const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+
     try {
       const values = await form.validateFields();
       
@@ -186,11 +265,31 @@ export default function ProductManager() {
 
       const newGltfFile = arGltfFileList.find(f => f.originFileObj)?.originFileObj;
       if (newGltfFile) {
-        messageApi.open({ type: "loading", content: "Đang tải file 3D (.glb) lên server..." });
-        arLink = await uploadArFileToBackend(newGltfFile);
-        messageApi.destroy();
+        setArGltfFileList(prev => prev.map(file =>
+          file.originFileObj === newGltfFile ? { ...file, status: "uploading", percent: glbUploadProgress } : file
+        ));
+        messageApi.open({
+          key: "glb-upload",
+          type: "loading",
+          content: "Uploading .glb model to Supabase Storage...",
+          duration: 0,
+        });
+        arLink = await uploadGlbModelToBackend(newGltfFile);
+        setArGltfFileList(prev => prev.map(file =>
+          file.originFileObj === newGltfFile
+            ? { ...file, status: "done", percent: 100, url: arLink, originFileObj: undefined }
+            : file
+        ));
+        messageApi.open({
+          key: "glb-upload",
+          type: "success",
+          content: ".glb model uploaded",
+          duration: 2,
+        });
       } else if (arGltfFileList.length === 0) {
         arLink = "";
+      } else {
+        arLink = arGltfFileList.find(f => !f.originFileObj)?.url || arLink;
       }
 
       const newUsdzFile = arUsdzFileList.find(f => f.originFileObj)?.originFileObj;
@@ -218,7 +317,18 @@ export default function ProductManager() {
       fetchProducts();
     } catch (e) {
       console.error("API Error:", e);
-      messageApi.error("Lưu thất bại, vui lòng kiểm tra lại");
+      messageApi.destroy();
+      setArGltfFileList(prev => prev.map(file =>
+        file.status === "uploading" ? { ...file, status: "error" } : file
+      ));
+      messageApi.open({
+        key: "glb-upload",
+        type: "error",
+        content: e?.message || "Save failed, please check the form again",
+        duration: 4,
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -366,7 +476,10 @@ export default function ProductManager() {
         title={editingProduct ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}
         open={isModalOpen}
         onOk={handleSave}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={() => {
+          if (!saving && !glbUploading) setIsModalOpen(false);
+        }}
+        confirmLoading={saving}
         width={800}
         okText="Lưu"
         cancelText="Hủy"
@@ -479,19 +592,31 @@ export default function ProductManager() {
               
               <Form.Item label="Mô hình AR Web/Android (.glb)">
                 <Upload
-                  fileList={arGltfFileList}
+                  fileList={arGltfFileList.map(file =>
+                    file.originFileObj && glbUploading
+                      ? { ...file, status: "uploading", percent: glbUploadProgress }
+                      : file
+                  )}
                   maxCount={1}
-                  accept=".glb"
-                  onRemove={() => setArGltfFileList([])}
-                  beforeUpload={(file) => {
-                    setArGltfFileList([{ uid: file.uid, name: file.name, status: "done", url: URL.createObjectURL(file), originFileObj: file }]);
-                    return false;
-                  }}
+                  accept=".glb,model/gltf-binary"
+                  disabled={saving || glbUploading}
+                  onRemove={handleGlbRemove}
+                  beforeUpload={handleGlbBeforeUpload}
                 >
                   {arGltfFileList.length < 1 && (
-                    <Button icon={<UploadOutlined />}>Tải lên file .glb</Button>
+                    <Button icon={<UploadOutlined />} loading={glbUploading}>
+                      Tai len file .glb
+                    </Button>
                   )}
                 </Upload>
+                {glbUploading && (
+                  <Progress
+                    className="mt-2"
+                    percent={glbUploadProgress}
+                    size="small"
+                    status="active"
+                  />
+                )}
                 {arGltfFileList.length > 0 && (
                   <div className="mt-3 border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center p-2" style={{height: 150}}>
                      <model-viewer
@@ -545,4 +670,4 @@ export default function ProductManager() {
       </Modal>
     </div>
   );
-}
+}

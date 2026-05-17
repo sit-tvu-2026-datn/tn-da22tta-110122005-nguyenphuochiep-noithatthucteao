@@ -1,11 +1,10 @@
 import { useState, useEffect, useContext } from "react";
 import {
   ShoppingCartOutlined,
-  FilterOutlined,
   ThunderboltFilled,
 } from "@ant-design/icons";
 import { Link, useSearchParams } from "react-router-dom";
-import { message, Empty, Spin, Drawer } from "antd";
+import { message, Empty, Spin, Drawer, Checkbox } from "antd";
 import { Eye, ShoppingCart, Filter, X, Grid, Zap, Clock } from "lucide-react";
 import Cookies from "js-cookie";
 import { CartContext } from "../context/CartContext.jsx";
@@ -94,18 +93,35 @@ export default function Products() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [flashSale, setFlashSale] = useState(null);
-  const [priceRange, setPriceRange] = useState({ min: null, max: null });
   const [loading, setLoading] = useState(true);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [isFilterSheet, setIsFilterSheet] = useState(false);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchTerm = searchParams.get("search") || "";
+  const initialCategory = searchParams.get("category");
+
+  // State lưu trữ các bộ lọc đang chọn (Mảng để hỗ trợ chọn nhiều)
+  const [selectedCategories, setSelectedCategories] = useState(
+    initialCategory ? [String(initialCategory)] : [],
+  );
+  const [selectedPrices, setSelectedPrices] = useState([]);
+  const activeFilterCount = selectedCategories.length + selectedPrices.length;
 
   const [messageApi, contextHolder] = message.useMessage();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const searchTerm = searchParams.get("search") || "";
-  const categoryId = searchParams.get("category");
-
   const token = Cookies.get("jwt");
   const { refreshCartCount } = useContext(CartContext);
+
+  useEffect(() => {
+    const syncFilterPanelMode = () => {
+      setIsFilterSheet(window.innerWidth < 768);
+    };
+
+    syncFilterPanelMode();
+    window.addEventListener("resize", syncFilterPanelMode);
+
+    return () => window.removeEventListener("resize", syncFilterPanelMode);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -114,11 +130,7 @@ export default function Products() {
         const [catRes, fsRes, prodRes] = await Promise.all([
           api.get("/api/categories"),
           api.get("/api/flash-sales/current").catch(() => ({ data: null })),
-          api.get(
-            `/api/products${
-              categoryId ? `?categoryId=${categoryId}` : ""
-            }`
-          ),
+          api.get("/api/products"), // Lấy toàn bộ sản phẩm để lọc ở frontend
         ]);
 
         setCategories(catRes.data);
@@ -138,13 +150,13 @@ export default function Products() {
     };
 
     fetchData();
-  }, [categoryId]);
+  }, []);
 
   // --- HELPER ---
   const getProductPriceInfo = (product) => {
     if (flashSale && flashSale.items) {
       const fsItem = flashSale.items.find(
-        (item) => item.productId === product.productId
+        (item) => item.productId === product.productId,
       );
       if (fsItem) {
         const isStillOnSale = fsItem.soldCount < fsItem.quantity;
@@ -153,7 +165,7 @@ export default function Products() {
             finalPrice: fsItem.flashSalePrice,
             originalPrice: product.price,
             discountPercent: Math.round(
-              ((product.price - fsItem.flashSalePrice) / product.price) * 100
+              ((product.price - fsItem.flashSalePrice) / product.price) * 100,
             ),
             isFlashSale: true,
             fsQuantity: fsItem.quantity,
@@ -176,40 +188,55 @@ export default function Products() {
     };
   };
 
-  // --- [ĐÃ SỬA] LỌC SẢN PHẨM HẾT SUẤT FLASH SALE ---
   const flashSaleList =
     flashSale?.items
-      // 1. Lọc bỏ những item đã bán hết suất (soldCount >= quantity)
       ?.filter((fsItem) => fsItem.soldCount < fsItem.quantity)
-      // 2. Sau đó mới map sang thông tin sản phẩm đầy đủ
       ?.map((fsItem) => {
-        const fullProduct = products.find(
-          (p) => p.productId === fsItem.productId
-        );
-        return fullProduct;
+        return products.find((p) => p.productId === fsItem.productId);
       })
       .filter(Boolean) || [];
 
-  // --- FILTER ---
+  // --- LỌC SẢN PHẨM NHIỀU ĐIỀU KIỆN ---
   const filteredProducts = products.filter((p) => {
+    // 1. Lọc theo tên
     const matchesName = p.productName
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
+
+    // 2. Lọc theo danh mục (chọn nhiều)
+    const prodCatId = String(p.categoryId || p.category?.categoryId);
+    const matchesCategory =
+      selectedCategories.length === 0 || selectedCategories.includes(prodCatId);
+
+    // 3. Lọc theo khoảng giá (chọn nhiều)
     const { finalPrice } = getProductPriceInfo(p);
     const matchesPrice =
-      (!priceRange.min || finalPrice >= priceRange.min) &&
-      (!priceRange.max || finalPrice <= priceRange.max);
+      selectedPrices.length === 0 ||
+      selectedPrices.some(
+        (range) => finalPrice >= range.min && finalPrice <= range.max,
+      );
 
-    return matchesName && matchesPrice;
+    return matchesName && matchesCategory && matchesPrice;
   });
 
-  const handleCategorySelect = (id) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (id === null) newParams.delete("category");
-    else newParams.set("category", id);
-    setPriceRange({ min: null, max: null });
-    setSearchParams(newParams);
-    setMobileFilterOpen(false);
+  const handleCategoryToggle = (categoryId) => {
+    const idStr = String(categoryId);
+    setSelectedCategories((prev) => {
+      const newSelected = prev.includes(idStr)
+        ? prev.filter((id) => id !== idStr)
+        : [...prev, idStr];
+
+      // Đồng bộ với URL Params (tùy chọn để link có thể chia sẻ)
+      const newParams = new URLSearchParams(searchParams);
+      if (newSelected.length === 0) {
+        newParams.delete("category");
+      } else {
+        newParams.set("category", newSelected.join(","));
+      }
+      setSearchParams(newParams);
+
+      return newSelected;
+    });
   };
 
   const priceOptions = [
@@ -219,13 +246,23 @@ export default function Products() {
     { label: "Trên 7 triệu", min: 7000000, max: Infinity },
   ];
 
-  const handlePriceFilter = (opt) => {
-    if (priceRange.min === opt.min && priceRange.max === opt.max) {
-      setPriceRange({ min: null, max: null });
-    } else {
-      setPriceRange({ min: opt.min, max: opt.max });
-    }
-    setMobileFilterOpen(false);
+  const handlePriceToggle = (opt) => {
+    setSelectedPrices((prev) => {
+      const exists = prev.some((p) => p.min === opt.min && p.max === opt.max);
+      if (exists) {
+        return prev.filter((p) => p.min !== opt.min || p.max !== opt.max);
+      } else {
+        return [...prev, opt];
+      }
+    });
+  };
+
+  const clearAllFilters = () => {
+    setSelectedCategories([]);
+    setSelectedPrices([]);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("category");
+    setSearchParams(newParams);
   };
 
   // --- LOGIC MUA HÀNG ---
@@ -238,7 +275,6 @@ export default function Products() {
     const { finalPrice, isFlashSale, fsQuantity, fsSold } =
       getProductPriceInfo(product);
 
-    // Kiểm tra tồn kho trước khi gửi request
     if (isFlashSale) {
       if (fsSold >= fsQuantity) {
         messageApi.error("Sản phẩm Flash Sale này đã hết suất!");
@@ -267,8 +303,7 @@ export default function Products() {
     };
 
     try {
-      const { data } = await api.post("/api/orders", orderPayload);
-
+      await api.post("/api/orders", orderPayload);
       messageApi.success({
         content: `Đã thêm ${product.productName} vào giỏ!`,
         icon: <ShoppingCartOutlined style={{ color: "green" }} />,
@@ -323,7 +358,8 @@ export default function Products() {
 
           <img
             src={
-              prod.imageUrls?.[0] || prod.imageUrl ||
+              prod.imageUrls?.[0] ||
+              prod.imageUrl ||
               "https://via.placeholder.com/400x400?text=No+Image"
             }
             alt={prod.productName}
@@ -381,8 +417,8 @@ export default function Products() {
                   isOutOfStock
                     ? "text-gray-400"
                     : isFlashSale
-                    ? "text-orange-600"
-                    : "text-red-600"
+                      ? "text-orange-600"
+                      : "text-red-600"
                 }`}
               >
                 {finalPrice?.toLocaleString("vi-VN")}₫
@@ -415,100 +451,51 @@ export default function Products() {
 
   const FilterContent = () => (
     <div className="space-y-8">
-      {/* Category Filter */}
+      {/* Category Checkbox Filter */}
       <div>
-        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
           <Grid size={16} /> Danh mục
         </h3>
-        <div className="space-y-2">
-          <div
-            onClick={() => handleCategorySelect(null)}
-            className={`cursor-pointer px-3 py-2.5 rounded-lg text-sm transition-all border flex items-center gap-3 ${
-              !categoryId
-                ? "bg-blue-50 border-blue-200 text-blue-700 font-medium"
-                : "border-transparent hover:bg-gray-50 text-gray-600"
-            }`}
-          >
-            <div
-              className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                !categoryId ? "border-blue-600" : "border-gray-300"
-              }`}
-            >
-              {!categoryId && (
-                <div className="w-2 h-2 rounded-full bg-blue-600"></div>
-              )}
-            </div>
-            <span>Tất cả sản phẩm</span>
-          </div>
-          {categories.map((cat) => {
-            const isActive = String(categoryId) === String(cat.categoryId);
-            return (
-              <div
-                key={cat.categoryId}
-                onClick={() => handleCategorySelect(cat.categoryId)}
-                className={`cursor-pointer px-3 py-2.5 rounded-lg text-sm transition-all border flex items-center gap-3 ${
-                  isActive
-                    ? "bg-blue-50 border-blue-200 text-blue-700 font-medium"
-                    : "border-transparent hover:bg-gray-50 text-gray-600"
-                }`}
+        <div className="space-y-3 px-1">
+          {categories.map((cat) => (
+            <div key={cat.categoryId} className="flex items-center">
+              <Checkbox
+                checked={selectedCategories.includes(String(cat.categoryId))}
+                onChange={() => handleCategoryToggle(cat.categoryId)}
+                className="text-gray-700 hover:text-blue-600 text-sm"
               >
-                <div
-                  className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                    isActive ? "border-blue-600" : "border-gray-300"
-                  }`}
-                >
-                  {isActive && (
-                    <div className="w-2 h-2 rounded-full bg-blue-600"></div>
-                  )}
-                </div>
-                <span>{cat.categoryName}</span>
-              </div>
-            );
-          })}
+                {cat.categoryName}
+              </Checkbox>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Price Filter */}
+      {/* Price Checkbox Filter */}
       <div className="border-t border-gray-100 pt-6">
-        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">
           Khoảng giá
         </h3>
-        <div className="space-y-2">
-          {priceOptions.map((opt, i) => {
-            const isChecked =
-              priceRange.min === opt.min && priceRange.max === opt.max;
-            return (
-              <div
-                key={i}
-                onClick={() => handlePriceFilter(opt)}
-                className={`cursor-pointer px-3 py-2.5 rounded-lg text-sm transition-all border flex items-center gap-3 ${
-                  isChecked
-                    ? "bg-blue-50 border-blue-200 text-blue-700 font-medium"
-                    : "border-transparent hover:bg-gray-50 text-gray-600"
-                }`}
+        <div className="space-y-3 px-1">
+          {priceOptions.map((opt, i) => (
+            <div key={i} className="flex items-center">
+              <Checkbox
+                checked={selectedPrices.some(
+                  (p) => p.min === opt.min && p.max === opt.max,
+                )}
+                onChange={() => handlePriceToggle(opt)}
+                className="text-gray-700 hover:text-blue-600 text-sm"
               >
-                <div
-                  className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                    isChecked ? "border-blue-600" : "border-gray-300"
-                  }`}
-                >
-                  {isChecked && (
-                    <div className="w-2 h-2 rounded-full bg-blue-600"></div>
-                  )}
-                </div>
                 {opt.label}
-              </div>
-            );
-          })}
+              </Checkbox>
+            </div>
+          ))}
         </div>
       </div>
 
-      {(priceRange.min !== null || priceRange.max !== null || categoryId) && (
+      {(selectedCategories.length > 0 || selectedPrices.length > 0) && (
         <button
-          onClick={() => {
-            setPriceRange({ min: null, max: null });
-            handleCategorySelect(null);
-          }}
+          onClick={clearAllFilters}
           className="w-full py-2.5 text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 transition mt-4"
         >
           Xóa tất cả bộ lọc
@@ -564,40 +551,57 @@ export default function Products() {
         {/* MAIN LIST */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 mb-4 pt-4">
           <h1 className="text-xl font-bold text-gray-800">
-            {categoryId
-              ? `Danh mục: ${
-                  categories.find(
-                    (c) => String(c.categoryId) === String(categoryId)
-                  )?.categoryName || "Sản phẩm"
-                }`
-              : ""}
+            {selectedCategories.length > 0
+              ? `Đang lọc theo ${selectedCategories.length} danh mục`
+              : "Tất cả sản phẩm"}
           </h1>
           <button
+            type="button"
             onClick={() => setMobileFilterOpen(true)}
-            className="lg:hidden flex items-center justify-center gap-2 bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-medium text-gray-700 shadow-sm"
+            className="group inline-flex items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-900/10"
           >
-            <Filter size={18} /> Bộ lọc & Sắp xếp
+            <Filter size={18} className="transition duration-300 group-hover:rotate-12" />
+            <span>Bộ lọc</span>
+            {activeFilterCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-900 px-1.5 text-[11px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          <aside className="hidden lg:block w-64 flex-shrink-0">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 sticky top-32">
-              <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-100">
-                <FilterOutlined className="text-blue-600 text-lg" />
-                <h2 className="font-bold text-gray-800 text-lg">Bộ lọc</h2>
-              </div>
-              <FilterContent />
-            </div>
-          </aside>
-
+        <div className="flex flex-col gap-8">
           <Drawer
-            title="Bộ lọc sản phẩm"
-            placement="right"
+            title={
+              <div className="flex items-center gap-2">
+                <Filter size={18} />
+                <span>Bộ lọc sản phẩm</span>
+              </div>
+            }
+            placement={isFilterSheet ? "bottom" : "right"}
             onClose={() => setMobileFilterOpen(false)}
             open={mobileFilterOpen}
-            width={320}
-            closeIcon={<X size={20} />}
+            width={380}
+            height={isFilterSheet ? "86vh" : undefined}
+            maskClosable
+            closeIcon={<X size={18} />}
+            styles={{
+              mask: {
+                backdropFilter: "blur(4px)",
+                background: "rgba(15, 23, 42, 0.28)",
+              },
+              content: {
+                borderRadius: isFilterSheet ? "24px 24px 0 0" : "0",
+                overflow: "hidden",
+              },
+              header: {
+                borderBottom: "1px solid #eef0f3",
+                padding: "18px 22px",
+              },
+              body: {
+                padding: "24px 22px",
+              },
+            }}
           >
             <FilterContent />
           </Drawer>
@@ -607,10 +611,7 @@ export default function Products() {
               <div className="bg-white rounded-xl shadow-sm p-16 flex flex-col items-center justify-center text-center">
                 <Empty description="Không tìm thấy sản phẩm nào phù hợp" />
                 <button
-                  onClick={() => {
-                    setPriceRange({ min: null, max: null });
-                    handleCategorySelect(null);
-                  }}
+                  onClick={clearAllFilters}
                   className="mt-4 text-blue-600 font-medium hover:underline"
                 >
                   Xóa tất cả bộ lọc

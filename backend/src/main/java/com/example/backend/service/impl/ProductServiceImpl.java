@@ -1,23 +1,36 @@
 package com.example.backend.service.impl;
 
 import com.example.backend.DTO.ProductDTO;
+import com.example.backend.exception.FileUploadException;
 import com.example.backend.model.Product;
 import com.example.backend.model.ProductImage;
 import com.example.backend.repository.ProductRepository;
 import com.example.backend.service.ProductService;
+import com.example.backend.service.SupabaseStorageService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import java.util.stream.Collectors;
 import java.util.List;
 import java.util.Optional;
 import java.util.ArrayList;
+import java.util.Objects;
 
 @Service
 public class ProductServiceImpl implements ProductService {
 
-    private final ProductRepository productRepository;
+    private static final Logger log = LoggerFactory.getLogger(ProductServiceImpl.class);
 
-    public ProductServiceImpl(ProductRepository productRepository) {
+    private final ProductRepository productRepository;
+    private final SupabaseStorageService supabaseStorageService;
+
+    public ProductServiceImpl(
+            ProductRepository productRepository,
+            SupabaseStorageService supabaseStorageService
+    ) {
         this.productRepository = productRepository;
+        this.supabaseStorageService = supabaseStorageService;
     }
 
     @Override
@@ -67,6 +80,8 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public ProductDTO updateProduct(String id, ProductDTO productDTO) {
         return productRepository.findById(id).map(existing -> {
+            String previousArLink = existing.getArLink();
+
             existing.setProductName(productDTO.getProductName());
             existing.setPrice(productDTO.getPrice());
             existing.setDescription(productDTO.getDescription());
@@ -98,13 +113,20 @@ public class ProductServiceImpl implements ProductService {
                 existing.getImages().addAll(newImages);
             }
 
-            return new ProductDTO(productRepository.save(existing));
+            ProductDTO savedProduct = new ProductDTO(productRepository.save(existing));
+            deleteOldProductModelIfChanged(previousArLink, savedProduct.getArLink());
+            return savedProduct;
         }).orElseThrow(() -> new RuntimeException("Product not found"));
     }
 
     @Override
     public void deleteProduct(String id) {
+        String arLink = productRepository.findById(id)
+                .map(Product::getArLink)
+                .orElse(null);
+
         productRepository.deleteById(id);
+        deleteProductModelQuietly(arLink);
     }
 
     @Override
@@ -119,5 +141,23 @@ public class ProductServiceImpl implements ProductService {
 
         return productRepository.findRelatedProducts(current.getCategoryId(), productId)
                 .stream().map(ProductDTO::new).collect(Collectors.toList());
+    }
+
+    private void deleteOldProductModelIfChanged(String previousArLink, String currentArLink) {
+        if (StringUtils.hasText(previousArLink) && !Objects.equals(previousArLink, currentArLink)) {
+            deleteProductModelQuietly(previousArLink);
+        }
+    }
+
+    private void deleteProductModelQuietly(String publicUrl) {
+        if (!StringUtils.hasText(publicUrl)) {
+            return;
+        }
+
+        try {
+            supabaseStorageService.deleteProductModelByPublicUrl(publicUrl);
+        } catch (FileUploadException e) {
+            log.warn("Could not delete old product model from Supabase: {}", publicUrl, e);
+        }
     }
 }
