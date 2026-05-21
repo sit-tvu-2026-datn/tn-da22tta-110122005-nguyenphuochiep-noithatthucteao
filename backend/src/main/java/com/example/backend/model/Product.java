@@ -49,6 +49,18 @@ public class Product {
     @Column(length = 50)
     private String size;
 
+    @Column(name = "length")
+    private Integer length;
+
+    @Column(name = "width")
+    private Integer width;
+
+    @Column(name = "height")
+    private Integer height;
+
+    @Column(name = "weight")
+    private Integer weight;
+
     @Column(length = 50)
     private String color;
 

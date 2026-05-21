@@ -6,6 +6,8 @@ import com.example.backend.DTO.ghn.GhnFeeResponse;
 import com.example.backend.DTO.ghn.GhnProvinceDTO;
 import com.example.backend.DTO.ghn.GhnServiceDTO;
 import com.example.backend.DTO.ghn.GhnWardDTO;
+import com.example.backend.DTO.ghn.ShippingFeeRequest;
+import com.example.backend.DTO.ghn.ShippingFeeResponse;
 
 import java.util.List;
 
@@ -15,4 +17,5 @@ public interface GhnService {
     List<GhnWardDTO> getWards(Integer districtId);
     List<GhnServiceDTO> getAvailableServices(Integer toDistrictId);
     GhnFeeResponse calculateShippingFee(GhnFeeRequest request);
+    ShippingFeeResponse calculateShippingFee(ShippingFeeRequest request);
 }

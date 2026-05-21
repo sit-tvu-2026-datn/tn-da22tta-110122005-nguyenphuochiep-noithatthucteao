@@ -6,6 +6,8 @@ import com.example.backend.DTO.ghn.GhnFeeResponse;
 import com.example.backend.DTO.ghn.GhnProvinceDTO;
 import com.example.backend.DTO.ghn.GhnServiceDTO;
 import com.example.backend.DTO.ghn.GhnWardDTO;
+import com.example.backend.DTO.ghn.ShippingFeeRequest;
+import com.example.backend.DTO.ghn.ShippingFeeResponse;
 import com.example.backend.exception.GhnApiException;
 import com.example.backend.service.GhnService;
 import jakarta.validation.Valid;
@@ -55,6 +57,11 @@ public class GhnController {
 
     @PostMapping("/fee")
     public GhnFeeResponse calculateShippingFee(@Valid @RequestBody GhnFeeRequest request) {
+        return ghnService.calculateShippingFee(request);
+    }
+
+    @PostMapping("/shipping-fee")
+    public ShippingFeeResponse calculateShippingFee(@Valid @RequestBody ShippingFeeRequest request) {
         return ghnService.calculateShippingFee(request);
     }
 

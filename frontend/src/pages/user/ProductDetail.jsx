@@ -531,8 +531,16 @@ function ProductInfo({
 }
 
 function ProductTabs({ product, activeTab, setActiveTab, reviews, averageRating, reviewForm, onReviewChange, onSubmitReview, submittingReview, token, hasPurchased }) {
+  const formatDimensions = (p) => {
+    if (p && p.length && p.width && p.height) {
+      return `${p.length} × ${p.width} × ${p.height} cm`;
+    }
+    return p ? p.size || "Có thể tùy chỉnh theo không gian" : "Có thể tùy chỉnh theo không gian";
+  };
+
   const specs = [
-    ["Kích thước", product.size || "Có thể tùy chỉnh theo không gian"],
+    ["Kích thước", formatDimensions(product)],
+    ...(product && product.weight ? [["Cân nặng", product.weight >= 1000 ? `${(product.weight / 1000).toFixed(1).replace(/\.0$/, '')} kg` : `${product.weight} g`]] : []),
     ["Màu sắc", product.color || "Ngà ấm"],
     ["Chất liệu", product.material || "Vải bọc cao cấp, chi tiết gỗ óc chó"],
     ["Xuất xứ", product.origin || "Ý"],

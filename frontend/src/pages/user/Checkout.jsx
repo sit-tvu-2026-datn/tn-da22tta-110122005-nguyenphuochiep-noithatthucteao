@@ -95,6 +95,8 @@ export default function Checkout() {
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState("");
   const shippingRequestRef = useRef(0);
+  const [isFreeShipping, setIsFreeShipping] = useState(false);
+  const [freeShippingReason, setFreeShippingReason] = useState("");
 
   const [singleProduct, setSingleProduct] = useState(state?.product || null);
   const [items, setItems] = useState(state?.order?.orderDetails || []);
@@ -276,6 +278,8 @@ export default function Checkout() {
       setShippingService(null);
       setShippingError("");
       setShippingLoading(false);
+      setIsFreeShipping(false);
+      setFreeShippingReason("");
       return undefined;
     }
 
@@ -284,6 +288,8 @@ export default function Checkout() {
       setShippingService(null);
       setShippingError("Vui lòng chọn đủ tỉnh/thành, quận/huyện, phường/xã để tính phí GHN.");
       setShippingLoading(false);
+      setIsFreeShipping(false);
+      setFreeShippingReason("");
       return undefined;
     }
 
@@ -311,8 +317,14 @@ export default function Checkout() {
             toDistrictId: selectedAddress.districtId,
             toWardCode: selectedAddress.wardCode,
             serviceId: service.serviceId,
-            ...DEFAULT_PACKAGE_SIZE,
-            weight: packageWeight,
+            subtotal: totalPrice,
+            items: productsToPay.map(item => {
+              const product = item.product || item;
+              return {
+                productId: product.productId,
+                quantity: item.quantity || 1
+              };
+            }),
             insuranceValue,
           },
           controller.signal
@@ -323,11 +335,15 @@ export default function Checkout() {
         const totalFee = Number(feeData?.totalFee || 0);
         setShippingService(service);
         setShippingFee(totalFee);
+        setIsFreeShipping(Boolean(feeData?.freeShipping));
+        setFreeShippingReason(feeData?.freeShippingReason || "");
         console.debug("[GHN] Fee calculated", {
           serviceId: service.serviceId,
           totalFee,
           toDistrictId: selectedAddress.districtId,
           toWardCode: selectedAddress.wardCode,
+          freeShipping: feeData?.freeShipping,
+          freeShippingReason: feeData?.freeShippingReason,
         });
       } catch (error) {
         if (isGhnRequestCanceled(error)) return;
@@ -335,6 +351,8 @@ export default function Checkout() {
         if (shippingRequestRef.current === requestId) {
           setShippingFee(0);
           setShippingService(null);
+          setIsFreeShipping(false);
+          setFreeShippingReason("");
           setShippingError(
             `${extractGhnError(error)}. Tạm thời hệ thống giữ phí vận chuyển 0đ.`
           );
@@ -353,9 +371,9 @@ export default function Checkout() {
   }, [
     selectedAddress,
     isAddressReady,
-    packageWeight,
+    productsToPay,
+    totalPrice,
     insuranceValue,
-    totalPriceWithCoupon,
   ]);
 
   // Fetch Payment Methods
@@ -985,9 +1003,16 @@ export default function Checkout() {
                       <span>
                         {shippingLoading
                           ? "Đang tính..."
-                          : `${shippingFee.toLocaleString()} ₫`}
+                          : isFreeShipping
+                            ? "Miễn phí"
+                            : `${shippingFee.toLocaleString()} ₫`}
                       </span>
                     </div>
+                    {isFreeShipping && !shippingLoading && freeShippingReason && (
+                      <p className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded inline-block mt-1">
+                        {freeShippingReason}
+                      </p>
+                    )}
                     {shippingService && !shippingLoading && (
                       <p className="text-xs text-blue-600">
                         GHN: {shippingService.shortName || "Dịch vụ khả dụng"}{" "}

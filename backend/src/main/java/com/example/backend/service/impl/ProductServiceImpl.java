@@ -54,6 +54,10 @@ public class ProductServiceImpl implements ProductService {
         product.setDiscount(productDTO.getDiscount());
         product.setCategoryId(productDTO.getCategoryId());
         product.setSize(productDTO.getSize());
+        product.setLength(productDTO.getLength());
+        product.setWidth(productDTO.getWidth());
+        product.setHeight(productDTO.getHeight());
+        product.setWeight(productDTO.getWeight());
         product.setColor(productDTO.getColor());
         product.setMaterial(productDTO.getMaterial());
         product.setWarranty(productDTO.getWarranty());
@@ -89,6 +93,10 @@ public class ProductServiceImpl implements ProductService {
             existing.setDiscount(productDTO.getDiscount());
             existing.setCategoryId(productDTO.getCategoryId());
             existing.setSize(productDTO.getSize());
+            existing.setLength(productDTO.getLength());
+            existing.setWidth(productDTO.getWidth());
+            existing.setHeight(productDTO.getHeight());
+            existing.setWeight(productDTO.getWeight());
             existing.setColor(productDTO.getColor());
             existing.setMaterial(productDTO.getMaterial());
             existing.setWarranty(productDTO.getWarranty());

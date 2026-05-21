@@ -22,6 +22,10 @@ public class ProductDTO {
     private BigDecimal discount;
     private String categoryId;
     private String size;
+    private Integer length;
+    private Integer width;
+    private Integer height;
+    private Integer weight;
     private String color;
     private String material;
     private String warranty;
@@ -47,6 +51,10 @@ public class ProductDTO {
         this.discount = product.getDiscount();
         this.categoryId = product.getCategoryId();
         this.size = product.getSize();
+        this.length = product.getLength();
+        this.width = product.getWidth();
+        this.height = product.getHeight();
+        this.weight = product.getWeight();
         this.color = product.getColor();
         this.material = product.getMaterial();
         this.warranty = product.getWarranty();

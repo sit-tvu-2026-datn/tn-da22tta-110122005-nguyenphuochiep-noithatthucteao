@@ -302,7 +302,10 @@ export default function ProductManager() {
       }
 
       const imageUrls = [...existingUrls, ...newUrls];
-      const payload = { ...values, imageUrls, arLink, arModelUsdz };
+      const sizeValue = values.length && values.width && values.height
+        ? `${values.length}x${values.width}x${values.height} cm`
+        : values.size;
+      const payload = { ...values, size: sizeValue, imageUrls, arLink, arModelUsdz };
       const method = editingProduct ? "put" : "post";
       const url = editingProduct
         ? `/api/products/${editingProduct.productId}`
@@ -655,9 +658,28 @@ export default function ProductManager() {
               <Form.Item name="color" label="Màu sắc" className="mt-2">
                 <Input />
               </Form.Item>
-              <Form.Item name="size" label="Kích thước">
-                <Input />
-              </Form.Item>
+              <Row gutter={8}>
+                <Col span={6}>
+                  <Form.Item name="length" label="Dài (cm)" rules={[{ required: true, message: 'Nhập Dài' }]}>
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="cm" />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="width" label="Rộng (cm)" rules={[{ required: true, message: 'Nhập Rộng' }]}>
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="cm" />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="height" label="Cao (cm)" rules={[{ required: true, message: 'Nhập Cao' }]}>
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="cm" />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="weight" label="Nặng (g)" rules={[{ required: true, message: 'Nhập Cân Nặng' }]}>
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="g" />
+                  </Form.Item>
+                </Col>
+              </Row>
               <Form.Item name="material" label="Chất liệu">
                 <Input />
               </Form.Item>

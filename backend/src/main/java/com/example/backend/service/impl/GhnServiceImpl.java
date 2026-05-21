@@ -6,9 +6,15 @@ import com.example.backend.DTO.ghn.GhnFeeResponse;
 import com.example.backend.DTO.ghn.GhnProvinceDTO;
 import com.example.backend.DTO.ghn.GhnServiceDTO;
 import com.example.backend.DTO.ghn.GhnWardDTO;
+import com.example.backend.DTO.ghn.ShippingFeeRequest;
+import com.example.backend.DTO.ghn.ShippingFeeResponse;
 import com.example.backend.config.GhnProperties;
 import com.example.backend.exception.GhnApiException;
+import com.example.backend.model.OrderDetail;
+import com.example.backend.model.Product;
+import com.example.backend.repository.ProductRepository;
 import com.example.backend.service.GhnService;
+import com.example.backend.util.ShippingCalculator;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,11 +47,17 @@ public class GhnServiceImpl implements GhnService {
 
     private final RestTemplate restTemplate;
     private final GhnProperties properties;
+    private final ProductRepository productRepository;
     private final ConcurrentMap<String, CacheEntry<?>> locationCache = new ConcurrentHashMap<>();
 
-    public GhnServiceImpl(RestTemplate restTemplate, GhnProperties properties) {
+    public GhnServiceImpl(
+            RestTemplate restTemplate,
+            GhnProperties properties,
+            ProductRepository productRepository
+    ) {
         this.restTemplate = restTemplate;
         this.properties = properties;
+        this.productRepository = productRepository;
     }
 
     @Override
@@ -218,6 +230,72 @@ public class GhnServiceImpl implements GhnService {
         }
 
         log.info("GHN fee response: serviceId={}, totalFee={}", serviceId, response.getTotalFee());
+        return response;
+    }
+
+    @Override
+    public ShippingFeeResponse calculateShippingFee(ShippingFeeRequest request) {
+        validatePositive(request.getToDistrictId(), "toDistrictId");
+        if (!StringUtils.hasText(request.getToWardCode())) {
+            throw new IllegalArgumentException("toWardCode is required");
+        }
+        validateConfigured();
+
+        // 1. Check free shipping rule
+        boolean free = ShippingCalculator.isFreeShipping(request.getSubtotal());
+        ShippingFeeResponse response = new ShippingFeeResponse();
+
+        if (free) {
+            response.setServiceId(request.getServiceId());
+            response.setTotalFee(0);
+            response.setServiceFee(0);
+            response.setInsuranceFee(0);
+            response.setFreeShipping(true);
+            response.setFreeShippingReason("Đơn hàng từ 15,000,000đ được miễn phí vận chuyển");
+            return response;
+        }
+
+        // 2. Fetch product dimensions and map to order details
+        List<OrderDetail> tempOrderDetails = new ArrayList<>();
+        if (request.getItems() != null) {
+            for (ShippingFeeRequest.CartItem cartItem : request.getItems()) {
+                OrderDetail detail = new OrderDetail();
+                detail.setQuantity(cartItem.getQuantity());
+
+                Product product = productRepository.findById(cartItem.getProductId()).orElse(null);
+                if (product != null) {
+                    detail.setProduct(product);
+                } else {
+                    Product dummy = new Product();
+                    dummy.setProductId(cartItem.getProductId());
+                    detail.setProduct(dummy);
+                }
+                tempOrderDetails.add(detail);
+            }
+        }
+
+        // 3. Aggregate dimensions
+        ShippingCalculator.PackageSpec spec = ShippingCalculator.calculate(tempOrderDetails, properties);
+
+        // 4. Delegate to the standard GHN call
+        GhnFeeRequest ghnRequest = new GhnFeeRequest();
+        ghnRequest.setToDistrictId(request.getToDistrictId());
+        ghnRequest.setToWardCode(request.getToWardCode());
+        ghnRequest.setServiceId(request.getServiceId());
+        ghnRequest.setLength(spec.length());
+        ghnRequest.setWidth(spec.width());
+        ghnRequest.setHeight(spec.height());
+        ghnRequest.setWeight(spec.weight());
+        ghnRequest.setInsuranceValue(request.getInsuranceValue());
+
+        GhnFeeResponse ghnFeeResponse = calculateShippingFee(ghnRequest);
+
+        response.setServiceId(ghnFeeResponse.getServiceId());
+        response.setTotalFee(ghnFeeResponse.getTotalFee());
+        response.setServiceFee(ghnFeeResponse.getServiceFee());
+        response.setInsuranceFee(ghnFeeResponse.getInsuranceFee());
+        response.setFreeShipping(false);
+        response.setFreeShippingReason("");
         return response;
     }
 

@@ -103,6 +103,34 @@ export const getAvailableServices = (toDistrictId, signal) => {
 };
 
 export const calculateShippingFee = (payload, signal) => {
+  if (payload?.items && Array.isArray(payload.items)) {
+    const normalizedPayload = {
+      toDistrictId: normalizeNumber(payload.toDistrictId),
+      toWardCode: String(payload.toWardCode || ""),
+      serviceId: normalizeNumber(payload.serviceId),
+      insuranceValue: normalizeNumber(payload.insuranceValue),
+      subtotal: normalizeNumber(payload.subtotal),
+      items: payload.items.map(item => ({
+        productId: String(item.productId || ""),
+        quantity: normalizeNumber(item.quantity) || 1,
+      })),
+    };
+
+    if (!normalizedPayload.toDistrictId || !normalizedPayload.toWardCode) {
+      return Promise.reject(new Error("Địa chỉ GHN chưa hợp lệ"));
+    }
+
+    const cacheKey = `shipping-fee:${JSON.stringify(normalizedPayload)}`;
+    return runCachedRequest(cacheKey, async () => {
+      debug("calculate shipping fee with items", normalizedPayload);
+      const { data } = await api.post("/api/ghn/shipping-fee", normalizedPayload, {
+        timeout: REQUEST_TIMEOUT,
+        signal,
+      });
+      return data;
+    });
+  }
+
   const normalizedPayload = {
     toDistrictId: normalizeNumber(payload?.toDistrictId),
     toWardCode: String(payload?.toWardCode || ""),
@@ -115,12 +143,12 @@ export const calculateShippingFee = (payload, signal) => {
   };
 
   if (!normalizedPayload.toDistrictId || !normalizedPayload.toWardCode) {
-    return Promise.reject(new Error("Dia chi GHN chua hop le"));
+    return Promise.reject(new Error("Địa chỉ GHN chưa hợp lệ"));
   }
 
   const cacheKey = `fee:${JSON.stringify(normalizedPayload)}`;
   return runCachedRequest(cacheKey, async () => {
-    debug("calculate shipping fee", normalizedPayload);
+    debug("calculate shipping fee old", normalizedPayload);
     const { data } = await api.post("/api/ghn/fee", normalizedPayload, {
       timeout: REQUEST_TIMEOUT,
       signal,
