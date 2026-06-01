@@ -6,7 +6,9 @@ import com.example.backend.model.*;
 import com.example.backend.repository.*;
 import com.example.backend.service.FlashSaleService;
 import com.example.backend.service.OrderService;
+import com.example.backend.service.InteractionTrackingService;
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,7 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentRepository paymentRepository;
     private final CouponRepository couponRepository;
     private final FlashSaleService flashSaleService;
+    private final InteractionTrackingService trackingService;
 
     @Autowired
     public OrderServiceImpl(OrderRepository orderRepository,
@@ -32,14 +35,17 @@ public class OrderServiceImpl implements OrderService {
                             OrderDetailRepository orderDetailRepository,
                             PaymentRepository paymentRepository,
                             CouponRepository couponRepository,
-                            FlashSaleService flashSaleService) {
+                            FlashSaleService flashSaleService,
+                            InteractionTrackingService trackingService) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.orderDetailRepository = orderDetailRepository;
         this.paymentRepository = paymentRepository;
         this.couponRepository = couponRepository;
         this.flashSaleService = flashSaleService;
+        this.trackingService = trackingService;
     }
+
 
 
 
@@ -107,12 +113,14 @@ public class OrderServiceImpl implements OrderService {
                 Product product = productRepository.findById(detail.getProduct().getProductId())
                         .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại"));
 
-                // CASE 1: MUA NGAY (IsOrder = true) -> TRỪ KHO
+                // CASE 1: MUA NGAY (IsOrder = true) -> TRỪ KHO & TRACK PURCHASE
                 if (Boolean.TRUE.equals(order.getIsOrder())) {
                     handleStockUpdate(product, detail.getQuantity(), detail.getIsFlashSale());
+                    trackingService.trackPurchase(order.getUserId(), product.getProductId());
                 }
-                // CASE 2: THÊM GIỎ HÀNG (IsOrder = false) -> KHÔNG TRỪ KHO, CHỈ CHECK
+                // CASE 2: THÊM GIỎ HÀNG (IsOrder = false) -> KHÔNG TRỪ KHO, CHỈ CHECK & TRACK ADD TO CART
                 else {
+                    trackingService.trackAddToCart(order.getUserId(), product.getProductId());
                     Optional<OrderDetail> existingDetailOpt = orderDetailRepository.findExistingCartItem(
                             order.getUserId(), product.getProductId());
 
@@ -131,6 +139,7 @@ public class OrderServiceImpl implements OrderService {
             }
         }
         return orderRepository.save(order);
+
     }
 
     @Override
@@ -159,7 +168,7 @@ public class OrderServiceImpl implements OrderService {
             processCouponUsage(req.getCouponId());
         }
 
-        // 3. Xử lý chi tiết đơn hàng & Trừ kho
+        // 3. Xử lý chi tiết đơn hàng & Trừ kho & Track Purchase
         List<OrderDetail> details = req.getOrderDetails().stream().map(d -> {
             OrderDetail od = new OrderDetail();
             Product product = productRepository.findById(d.getProduct().getProductId())
@@ -168,6 +177,9 @@ public class OrderServiceImpl implements OrderService {
             // [QUAN TRỌNG] GỌI HÀM TRỪ KHO TẠI ĐÂY
             // d.getIsFlashSale() sẽ lấy giá trị từ JSON Frontend
             handleStockUpdate(product, d.getQuantity(), d.getIsFlashSale());
+            
+            // Ghi nhận tương tác mua hàng cho hệ thống gợi ý
+            trackingService.trackPurchase(req.getUserId(), product.getProductId());
 
             od.setProduct(product);
             od.setQuantity(d.getQuantity());
@@ -176,6 +188,7 @@ public class OrderServiceImpl implements OrderService {
             od.setOrder(order);
             return od;
         }).collect(Collectors.toList());
+
 
         order.setOrderDetails(details);
         return orderRepository.save(order);
@@ -215,12 +228,16 @@ public class OrderServiceImpl implements OrderService {
             // Xử lý kho
             handleStockUpdate(product, od.getQuantity(), od.getIsFlashSale());
 
+            // Ghi nhận tương tác mua hàng cho hệ thống gợi ý
+            trackingService.trackPurchase(userId, product.getProductId());
+
             detail.setProduct(product);
             detail.setQuantity(od.getQuantity());
             detail.setUnitPrice(od.getUnitPrice());
             detail.setOrder(newOrder);
             return detail;
         }).collect(Collectors.toList());
+
 
         newOrder.setOrderDetails(newDetails);
         return orderRepository.save(newOrder);

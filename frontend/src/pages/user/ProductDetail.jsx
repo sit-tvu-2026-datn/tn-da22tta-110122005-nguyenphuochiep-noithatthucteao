@@ -23,6 +23,8 @@ import Cookies from "js-cookie";
 import { CartContext } from "../../context/CartContext";
 import "@google/model-viewer";
 import api from "../../config/api";
+import SimilarProducts from "../../components/SimilarProducts";
+
 
 const LUXURY_EASE = [0.22, 1, 0.36, 1];
 const MONEY_FORMATTER = new Intl.NumberFormat("vi-VN");
@@ -838,6 +840,14 @@ export default function ProductDetail() {
     fetchProduct();
   }, [productId]);
 
+  // === GHI NHẬN LƯỢT XEM SẢN PHẨM CHO HỆ THỐNG GỢI Ý ===
+  useEffect(() => {
+    if (!productId || !currentUserId || !token) return;
+    api.post('/api/recommend/track-view', { userId: currentUserId, productId })
+      .catch(err => console.error('Track view error:', err));
+  }, [productId, currentUserId, token]);
+
+
   useEffect(() => {
     if (!productId) return;
 
@@ -1122,7 +1132,10 @@ export default function ProductDetail() {
         hasPurchased={hasPurchased}
       />
 
+      <SimilarProducts productId={productId} onAddToCart={handleAddToCart} />
+
       <RelatedProducts products={displayedRelatedProducts} onAddToCart={handleAddToCart} />
+
 
       <MobilePurchaseBar
         product={product}

@@ -8,7 +8,9 @@ import com.example.backend.repository.ProductRepository;
 import com.example.backend.repository.ReviewRepository;
 import com.example.backend.repository.UserRepository;
 import com.example.backend.service.ReviewService;
+import com.example.backend.service.InteractionTrackingService;
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,6 +27,10 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Autowired
     private ProductRepository productRepository; // Cần có Repository này
+
+    @Autowired
+    private InteractionTrackingService trackingService;
+
 
     @Override
     public List<ReviewDTO> getAllReviews() {
@@ -57,7 +63,12 @@ public class ReviewServiceImpl implements ReviewService {
 
         // 3. Lưu
         Review savedReview = reviewRepository.save(review);
+        
+        // Ghi nhận tương tác đánh giá sản phẩm cho hệ thống gợi ý
+        trackingService.trackReview(user.getUserId(), product.getProductId(), savedReview.getRating());
+
         return mapToDTO(savedReview);
+
     }
 
     @Override
@@ -70,7 +81,12 @@ public class ReviewServiceImpl implements ReviewService {
         review.setComment(reviewDTO.getComment());
 
         Review updatedReview = reviewRepository.save(review);
+        
+        // Cập nhật điểm đánh giá sản phẩm trong hệ thống gợi ý
+        trackingService.trackReview(review.getUser().getUserId(), review.getProduct().getProductId(), updatedReview.getRating());
+
         return mapToDTO(updatedReview);
+
     }
 
     @Override

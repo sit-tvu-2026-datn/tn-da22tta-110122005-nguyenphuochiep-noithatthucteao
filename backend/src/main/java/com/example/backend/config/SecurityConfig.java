@@ -56,9 +56,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/flash-sales/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/slideshows/public").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/chatbot/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/recommend/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/recommend/track-view").hasAnyRole("USER", "ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/api/users/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/users/**").hasAnyRole("USER", "ADMIN")
+
 
                         .requestMatchers(HttpMethod.POST, "/api/reviews/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/reviews/**").hasAnyRole("USER", "ADMIN")

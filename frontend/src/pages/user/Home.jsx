@@ -1,5 +1,6 @@
 import Slideshow from "../../components/Slideshow";
 import Products from "../../components/Products";
+import PersonalizedRecommendations from "../../components/PersonalizedRecommendations";
 
 export default function Home() {
   return (
@@ -9,6 +10,9 @@ export default function Home() {
         <Slideshow />
       </section>
 
+      {/* Gợi ý sản phẩm cá nhân hóa */}
+      <PersonalizedRecommendations />
+
       {/* Danh sách sản phẩm */}
       {/* Component Products tự quản lý việc hiển thị sản phẩm, phân trang và bộ lọc riêng của nó */}
       <section>
@@ -17,3 +21,4 @@ export default function Home() {
     </div>
   );
 }
+

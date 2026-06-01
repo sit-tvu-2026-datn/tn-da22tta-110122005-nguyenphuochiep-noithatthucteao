@@ -32,6 +32,11 @@ import { AuthContext } from "../../context/AuthContext";
 import Cookies from "js-cookie";
 import '@google/model-viewer'; // Import model-viewer cho AR Preview
 import api from "../../config/api";
+import ProductBasicInfoSection from "./components/ProductBasicInfoSection";
+import ProductShippingSection from "./components/ProductShippingSection";
+import ProductMetadataSection from "./components/ProductMetadataSection";
+import ProductDescriptionSection from "./components/ProductDescriptionSection";
+import ProductMediaSection from "./components/ProductMediaSection";
 
 const { Title } = Typography;
 const GLB_UPLOAD_ENDPOINT = "/api/upload/models/glb";
@@ -476,219 +481,96 @@ export default function ProductManager() {
       </Card>
 
       <Modal
-        title={editingProduct ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}
         open={isModalOpen}
-        onOk={handleSave}
         onCancel={() => {
           if (!saving && !glbUploading) setIsModalOpen(false);
         }}
-        confirmLoading={saving}
-        width={800}
-        okText="Lưu"
-        cancelText="Hủy"
+        width={1300}
         centered
+        footer={null}
+        title={null}
+        styles={{ body: { padding: 0 } }}
+        bodyStyle={{ padding: 0 }}
       >
-        <Form form={form} layout="vertical" className="pt-4">
-          <Row gutter={16}>
-            <Col span={24} md={16}>
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="productName"
-                    label="Tên sản phẩm"
-                    rules={[{ required: true }]}
-                  >
-                    <Input />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name="productId"
-                    label="Mã SP"
-                    rules={[{ required: true }]}
-                  >
-                    <Input disabled={!!editingProduct} className="font-mono" />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item
-                    name="price"
-                    label="Giá"
-                    rules={[{ required: true }]}
-                  >
-                    <InputNumber
-                      min={0}
-                      style={{ width: "100%" }}
-                      formatter={(value) =>
-                        `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                      }
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item
-                    name="quantity"
-                    label="Số lượng"
-                    rules={[{ required: true }]}
-                  >
-                    <InputNumber min={0} style={{ width: "100%" }} />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item name="discount" label="Giảm giá (%)">
-                    <InputNumber min={0} max={100} style={{ width: "100%" }} />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name="categoryId"
-                    label="Danh mục"
-                    rules={[{ required: true }]}
-                  >
-                    <Select
-                      options={categories.map((c) => ({
-                        label: c.categoryName,
-                        value: c.categoryId,
-                      }))}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item name="warranty" label="Bảo hành">
-                    <Input />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item name="description" label="Mô tả">
-                    <Input.TextArea rows={3} />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Col>
+        <div className="flex flex-col max-h-[90vh]">
+          {/* Header */}
+          <div className="sticky top-0 bg-white z-10 px-6 py-4 border-b border-slate-100 flex justify-between items-center rounded-t-xl">
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 m-0">
+                {editingProduct ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {editingProduct ? `Mã sản phẩm: ${editingProduct.productId}` : "Tạo sản phẩm mới cho cửa hàng"}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                if (!saving && !glbUploading) setIsModalOpen(false);
+              }}
+              className="text-slate-400 hover:text-slate-600 transition p-1 hover:bg-slate-50 rounded-full"
+              disabled={saving || glbUploading}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
 
-            <Col span={24} md={8}>
-              <Form.Item label="Hình ảnh (Max 5 ảnh)">
-                <Upload
-                  listType="picture-card"
-                  fileList={fileList}
-                  multiple={true}
-                  maxCount={5}
-                  onRemove={(file) => {
-                    setFileList(fileList.filter(f => f.uid !== file.uid));
-                  }}
-                  beforeUpload={(file, fileListArg) => {
-                    setFileList(prev => [
-                      ...prev,
-                      { uid: file.uid, name: file.name, status: "done", url: URL.createObjectURL(file), originFileObj: file }
-                    ]);
-                    return false;
-                  }}
-                >
-                  {fileList.length < 5 && (
-                    <div className="flex flex-col items-center">
-                      <UploadOutlined />
-                      <div className="mt-2 text-xs">Upload</div>
-                    </div>
-                  )}
-                </Upload>
-              </Form.Item>
-              
-              <Form.Item label="Mô hình AR Web/Android (.glb)">
-                <Upload
-                  fileList={arGltfFileList.map(file =>
-                    file.originFileObj && glbUploading
-                      ? { ...file, status: "uploading", percent: glbUploadProgress }
-                      : file
-                  )}
-                  maxCount={1}
-                  accept=".glb,model/gltf-binary"
-                  disabled={saving || glbUploading}
-                  onRemove={handleGlbRemove}
-                  beforeUpload={handleGlbBeforeUpload}
-                >
-                  {arGltfFileList.length < 1 && (
-                    <Button icon={<UploadOutlined />} loading={glbUploading}>
-                      Tai len file .glb
-                    </Button>
-                  )}
-                </Upload>
-                {glbUploading && (
-                  <Progress
-                    className="mt-2"
-                    percent={glbUploadProgress}
-                    size="small"
-                    status="active"
+          {/* Form Content */}
+          <Form form={form} layout="vertical">
+            <div className="px-6 py-5 overflow-y-auto bg-slate-50 flex-1" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Left column (70%) */}
+                <div className="w-full lg:w-[70%] space-y-6">
+                  <ProductBasicInfoSection 
+                    categories={categories} 
+                    editingProduct={editingProduct} 
                   />
-                )}
-                {arGltfFileList.length > 0 && (
-                  <div className="mt-3 border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center p-2" style={{height: 150}}>
-                     <model-viewer
-                        src={arGltfFileList[0].url}
-                        auto-rotate
-                        camera-controls
-                        style={{width: '100%', height: '100%'}}
-                     ></model-viewer>
-                  </div>
-                )}
-                {(arGltfFileList[0]?.url && !arGltfFileList[0]?.originFileObj) && (
-                   <div className="mt-2 text-xs text-green-600 truncate break-all">Đã lưu: {arGltfFileList[0].url}</div>
-                )}
-              </Form.Item>
+                  <ProductShippingSection />
+                  <ProductMetadataSection />
+                  <ProductDescriptionSection />
+                </div>
 
-              <Form.Item label="Mô hình AR iOS (.usdz)">
-                <Upload
-                  fileList={arUsdzFileList}
-                  maxCount={1}
-                  accept=".usdz"
-                  onRemove={() => setArUsdzFileList([])}
-                  beforeUpload={(file) => {
-                    setArUsdzFileList([{ uid: file.uid, name: file.name, status: "done", url: URL.createObjectURL(file), originFileObj: file }]);
-                    return false;
-                  }}
-                >
-                  {arUsdzFileList.length < 1 && (
-                    <Button icon={<UploadOutlined />}>Tải lên file .usdz</Button>
-                  )}
-                </Upload>
-                {(arUsdzFileList[0]?.url && !arUsdzFileList[0]?.originFileObj) && (
-                   <div className="mt-2 text-xs text-green-600 truncate break-all">Đã lưu: {arUsdzFileList[0].url}</div>
-                )}
-              </Form.Item>
+                {/* Right column (30%) */}
+                <div className="w-full lg:w-[30%]">
+                  <ProductMediaSection
+                    fileList={fileList}
+                    setFileList={setFileList}
+                    arGltfFileList={arGltfFileList}
+                    setArGltfFileList={setArGltfFileList}
+                    arUsdzFileList={arUsdzFileList}
+                    setArUsdzFileList={setArUsdzFileList}
+                    glbUploading={glbUploading}
+                    glbUploadProgress={glbUploadProgress}
+                    handleGlbRemove={handleGlbRemove}
+                    handleGlbBeforeUpload={handleGlbBeforeUpload}
+                    saving={saving}
+                  />
+                </div>
+              </div>
+            </div>
 
-              <Form.Item name="color" label="Màu sắc" className="mt-2">
-                <Input />
-              </Form.Item>
-              <Row gutter={8}>
-                <Col span={6}>
-                  <Form.Item name="length" label="Dài (cm)" rules={[{ required: true, message: 'Nhập Dài' }]}>
-                    <InputNumber min={1} style={{ width: '100%' }} placeholder="cm" />
-                  </Form.Item>
-                </Col>
-                <Col span={6}>
-                  <Form.Item name="width" label="Rộng (cm)" rules={[{ required: true, message: 'Nhập Rộng' }]}>
-                    <InputNumber min={1} style={{ width: '100%' }} placeholder="cm" />
-                  </Form.Item>
-                </Col>
-                <Col span={6}>
-                  <Form.Item name="height" label="Cao (cm)" rules={[{ required: true, message: 'Nhập Cao' }]}>
-                    <InputNumber min={1} style={{ width: '100%' }} placeholder="cm" />
-                  </Form.Item>
-                </Col>
-                <Col span={6}>
-                  <Form.Item name="weight" label="Nặng (g)" rules={[{ required: true, message: 'Nhập Cân Nặng' }]}>
-                    <InputNumber min={1} style={{ width: '100%' }} placeholder="g" />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Form.Item name="material" label="Chất liệu">
-                <Input />
-              </Form.Item>
-              <Form.Item name="origin" label="Xuất xứ">
-                <Input />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form>
+            {/* Footer */}
+            <div className="sticky bottom-0 bg-white z-10 px-6 py-4 border-t border-slate-100 flex justify-end items-center gap-3 rounded-b-xl">
+              <Button
+                onClick={() => setIsModalOpen(false)}
+                disabled={saving || glbUploading}
+                className="h-10 px-5 rounded-lg border-slate-200 hover:text-slate-700"
+              >
+                Hủy
+              </Button>
+              <Button
+                type="primary"
+                onClick={handleSave}
+                loading={saving}
+                disabled={glbUploading}
+                className="h-10 px-6 rounded-lg bg-blue-600 hover:bg-blue-700 font-semibold"
+              >
+                Lưu thay đổi
+              </Button>
+            </div>
+          </Form>
+        </div>
       </Modal>
     </div>
   );
