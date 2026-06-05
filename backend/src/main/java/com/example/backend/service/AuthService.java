@@ -48,4 +48,30 @@ public class AuthService {
         // Có thể bổ sung cơ chế blacklist JWT nếu cần
         return "Logout successful";
     }
+
+    public User processOAuth2User(String email, String name, String picture, String googleId) {
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        User user;
+        if (userOpt.isEmpty()) {
+            user = new User();
+            user.setUserId(UUID.randomUUID().toString());
+            user.setEmail(email);
+            user.setFullName(name != null ? name : "Google User");
+            user.setAvatar(picture);
+            user.setRole("USER");
+            user.setProvider("GOOGLE");
+            user.setProviderId(googleId);
+            user.setPassword(encoder.encode("GOOGLE_AUTH"));
+            userRepository.save(user);
+        } else {
+            user = userOpt.get();
+            user.setProvider("GOOGLE");
+            user.setProviderId(googleId);
+            if (picture != null && (user.getAvatar() == null || user.getAvatar().isEmpty())) {
+                user.setAvatar(picture);
+            }
+            userRepository.save(user);
+        }
+        return user;
+    }
 }

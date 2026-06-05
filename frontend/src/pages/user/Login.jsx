@@ -239,6 +239,32 @@ export default function Login() {
             </div>
           )}
 
+          {!isLoggingIn && (
+            <>
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Hoặc</span>
+                </div>
+              </div>
+
+              <a
+                href="/oauth2/authorization/google"
+                className="w-full flex justify-center items-center gap-2 border border-gray-300 rounded-xl bg-white text-gray-700 px-4 py-3 shadow-sm hover:bg-gray-50 transition-colors font-medium text-sm"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#EA4335"
+                    d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114A5.96 5.96 0 0 1 8 12.557a5.96 5.96 0 0 1 5.991-5.96c1.523 0 2.9.575 3.96 1.503l3.08-3.08C19.123 3.14 16.745 2 13.991 2 8.18 2 3.5 6.7 3.5 12.5s4.68 10.5 10.491 10.5c5.783 0 9.872-3.984 9.872-9.752 0-.616-.067-1.2-.187-1.748L12.24 10.285z"
+                  />
+                </svg>
+                Đăng nhập bằng Google
+              </a>
+            </>
+          )}
+
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

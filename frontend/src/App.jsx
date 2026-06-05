@@ -18,6 +18,7 @@ import SlideshowManager from "./pages/admin/SlideshowManager";
 import Home from "./pages/user/Home";
 import Login from "./pages/user/Login";
 import Register from "./pages/user/Register";
+import LoginSuccess from "./pages/user/LoginSuccess";
 import EditProfile from "./pages/user/profile/EditProfile";
 import PromotionsPage from "./pages/PromotionsPage";
 import ContactPage from "./pages/ContactPage";
@@ -35,6 +36,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/login/success" element={<LoginSuccess />} />
 
         <Route element={<MainLayout />}>
           <Route path="/" element={<Home />} />

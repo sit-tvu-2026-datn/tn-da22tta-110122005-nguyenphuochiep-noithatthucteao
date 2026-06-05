@@ -45,6 +45,12 @@ public class User {
     @Column(name = "role", length = 20)
     private String role = "USER";
 
+    @Column(name = "provider", length = 20)
+    private String provider = "LOCAL";
+
+    @Column(name = "provider_id")
+    private String providerId;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private Timestamp createdAt;
 }
