@@ -30,4 +30,24 @@ public interface RecommendationService {
      * Gợi ý sản phẩm phổ biến (bán chạy nhất) hoặc sản phẩm mới nhất làm fallback.
      */
     RecommendationResponse getPopular(int limit);
+
+    /**
+     * Gợi ý "Dành riêng cho bạn" (For You) dựa trên hồ sơ sở thích người dùng.
+     */
+    RecommendationResponse getForYou(String userId, int limit);
+
+    /**
+     * Gợi ý sản phẩm đang thịnh hành (Trending) theo hành vi gần đây.
+     */
+    RecommendationResponse getTrending(int limit);
+
+    /**
+     * Gợi ý sản phẩm được đánh giá cao nhất (Top Rated).
+     */
+    RecommendationResponse getTopRated(int limit);
+
+    /**
+     * Gợi ý "Khách hàng cũng mua" dựa trên co-occurrence trong đơn hàng.
+     */
+    RecommendationResponse getAlsoBought(String productId, int limit);
 }

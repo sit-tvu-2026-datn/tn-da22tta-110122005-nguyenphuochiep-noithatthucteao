@@ -31,12 +31,12 @@ export default function MainLayout() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen w-full bg-gray-50 font-sans overflow-x-hidden text-gray-800 relative">
+    <div className="flex flex-col min-h-screen w-full bg-ivory font-montserrat overflow-x-hidden text-nero relative">
       {/* Header cố định */}
       <Header />
 
       {/* Nội dung chính */}
-      <main className="flex-grow w-full pt-[120px] lg:pt-[130px] pb-10">
+      <main className="flex-grow w-full pt-[104px] lg:pt-[112px] pb-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Outlet />
         </div>
@@ -54,14 +54,14 @@ export default function MainLayout() {
       {/* 3. NÚT CUỘN VỀ ĐẦU TRANG */}
       <button
         onClick={scrollToTop}
-        className={`fixed bottom-8 right-8 z-40 p-3 rounded-full shadow-lg transition-all duration-300 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+        className={`fixed bottom-8 right-8 z-40 p-3 transition-all duration-500 transform hover:scale-105 focus:outline-none ${
           showScrollTop
-            ? "bg-white text-blue-600 border border-blue-100 opacity-100 translate-y-0"
+            ? "bg-nero text-champagne border border-champagne/20 opacity-100 translate-y-0 shadow-[0_10px_30px_rgba(0,0,0,0.3)]"
             : "bg-transparent text-transparent opacity-0 translate-y-10 pointer-events-none"
         }`}
         aria-label="Về đầu trang"
       >
-        <ArrowUp size={24} strokeWidth={2.5} />
+        <ArrowUp size={20} strokeWidth={1.5} />
       </button>
     </div>
   );

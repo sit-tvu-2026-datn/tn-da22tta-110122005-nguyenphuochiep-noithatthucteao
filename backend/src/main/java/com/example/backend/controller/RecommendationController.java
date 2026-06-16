@@ -89,6 +89,60 @@ public class RecommendationController {
     }
 
     /**
+     * API gợi ý "Dành riêng cho bạn" (For You) dựa trên hồ sơ sở thích người dùng.
+     * Phục vụ trang chủ cho người dùng đã đăng nhập.
+     *
+     * @param userId Mã người dùng hiện tại
+     * @param limit  Giới hạn số lượng kết quả (mặc định là 8)
+     */
+    @GetMapping("/foryou/{userId}")
+    public ResponseEntity<RecommendationResponse> getForYouRecommendations(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "8") int limit
+    ) {
+        return ResponseEntity.ok(recommendationService.getForYou(userId, limit));
+    }
+
+    /**
+     * API gợi ý sản phẩm đang thịnh hành (Trending) theo hành vi gần đây của toàn hệ thống.
+     *
+     * @param limit Giới hạn số lượng kết quả (mặc định là 8)
+     */
+    @GetMapping("/trending")
+    public ResponseEntity<RecommendationResponse> getTrendingRecommendations(
+            @RequestParam(defaultValue = "8") int limit
+    ) {
+        return ResponseEntity.ok(recommendationService.getTrending(limit));
+    }
+
+    /**
+     * API gợi ý sản phẩm được đánh giá cao nhất (Top Rated) theo điểm Bayesian.
+     *
+     * @param limit Giới hạn số lượng kết quả (mặc định là 8)
+     */
+    @GetMapping("/top-rated")
+    public ResponseEntity<RecommendationResponse> getTopRatedRecommendations(
+            @RequestParam(defaultValue = "8") int limit
+    ) {
+        return ResponseEntity.ok(recommendationService.getTopRated(limit));
+    }
+
+    /**
+     * API gợi ý "Khách hàng cũng mua" cho một sản phẩm cụ thể (co-occurrence trong đơn hàng).
+     * Phục vụ trang Chi tiết sản phẩm.
+     *
+     * @param productId Mã sản phẩm đang xem
+     * @param limit     Giới hạn số lượng kết quả (mặc định là 8)
+     */
+    @GetMapping("/also-bought/{productId}")
+    public ResponseEntity<RecommendationResponse> getAlsoBoughtRecommendations(
+            @PathVariable String productId,
+            @RequestParam(defaultValue = "8") int limit
+    ) {
+        return ResponseEntity.ok(recommendationService.getAlsoBought(productId, limit));
+    }
+
+    /**
      * API ghi nhận lượt xem sản phẩm của người dùng để lưu vào lịch sử xem và tương tác.
      * Yêu cầu xác thực phía client và gửi payload chứa userId, productId.
      */

@@ -5,14 +5,17 @@ import com.example.backend.DTO.RecommendationResponse;
 import com.example.backend.model.Product;
 import com.example.backend.model.RecommendationCache;
 import com.example.backend.model.UserProductInteraction;
+import com.example.backend.repository.OrderDetailRepository;
 import com.example.backend.repository.ProductRepository;
 import com.example.backend.repository.RecommendationCacheRepository;
 import com.example.backend.repository.UserProductInteractionRepository;
 import com.example.backend.service.CollaborativeFilteringService;
+import com.example.backend.service.ContentBasedService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +37,9 @@ public class CollaborativeFilteringServiceImpl implements CollaborativeFiltering
     private final UserProductInteractionRepository interactionRepository;
     private final ProductRepository productRepository;
     private final RecommendationCacheRepository cacheRepository;
+    private final RecommendationCacheWriter cacheWriter;
+    private final OrderDetailRepository orderDetailRepository;
+    private final ContentBasedService contentBasedService;
     private final ObjectMapper objectMapper;
 
     // Bộ nhớ đệm ma trận tương đồng giữa các sản phẩm (Item-Item Similarity Matrix)
@@ -138,15 +144,8 @@ public class CollaborativeFilteringServiceImpl implements CollaborativeFiltering
             List<RecommendationDTO> cacheList = predictions.stream().limit(20).collect(Collectors.toList());
             String jsonCache = objectMapper.writeValueAsString(cacheList);
 
-            cacheRepository.findByCacheKey(cacheKey).ifPresent(cacheRepository::delete);
-
-            // Lưu cache mới hết hạn sau 30 phút (Collaborative Filtering cập nhật nhanh hơn)
-            RecommendationCache newCache = RecommendationCache.builder()
-                    .cacheKey(cacheKey)
-                    .recommendationData(jsonCache)
-                    .expiresAt(LocalDateTime.now().plusMinutes(30))
-                    .build();
-            cacheRepository.save(newCache);
+            // Lưu cache mới hết hạn sau 30 phút (UPSERT atomic, thread-safe)
+            cacheWriter.put(cacheKey, jsonCache, LocalDateTime.now().plusMinutes(30));
 
             List<RecommendationDTO> resultList = predictions.stream().limit(limit).collect(Collectors.toList());
             return RecommendationResponse.success(resultList, "COLLABORATIVE", "Gợi ý cá nhân hóa dựa trên lịch sử mua sắm");
@@ -154,6 +153,71 @@ public class CollaborativeFilteringServiceImpl implements CollaborativeFiltering
         } catch (Exception e) {
             log.error("Lỗi khi tính toán gợi ý lọc cộng tác cho người dùng: {}", userId, e);
             return RecommendationResponse.empty("Lỗi hệ thống khi tính toán gợi ý");
+        }
+    }
+
+    @Override
+    @Transactional
+    public RecommendationResponse getAlsoBought(String productId, int limit) {
+        log.info("Yêu cầu gợi ý 'Khách hàng cũng mua' cho sản phẩm: {}, giới hạn: {}", productId, limit);
+        String cacheKey = "alsobought:" + productId;
+
+        // 1. Thử cache DB
+        try {
+            Optional<RecommendationCache> cached = cacheRepository.findByCacheKeyAndExpiresAtAfter(cacheKey, LocalDateTime.now());
+            if (cached.isPresent()) {
+                List<RecommendationDTO> recs = objectMapper.readValue(
+                        cached.get().getRecommendationData(),
+                        new TypeReference<List<RecommendationDTO>>() {});
+                return RecommendationResponse.success(
+                        recs.stream().limit(limit).collect(Collectors.toList()),
+                        "ALSO_BOUGHT", "Khách hàng cũng mua (Cached)");
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi đọc cache Also Bought cho sản phẩm: {}", productId, e);
+        }
+
+        try {
+            // 2. Lấy danh sách sản phẩm đồng mua từ đơn hàng: [productId, frequency]
+            List<Object[]> rows = orderDetailRepository.findAlsoBoughtProductIds(productId, PageRequest.of(0, 20));
+
+            // 3. Nếu thiếu dữ liệu đồng mua -> fallback sang Content-Based
+            if (rows.isEmpty()) {
+                log.info("Không có dữ liệu đồng mua cho sản phẩm {}. Fallback sang Content-Based.", productId);
+                RecommendationResponse fallback = contentBasedService.getContentBasedRecommendations(productId, limit);
+                fallback.setRecommendationType("ALSO_BOUGHT");
+                fallback.setMessage("Sản phẩm liên quan bạn có thể thích");
+                return fallback;
+            }
+
+            double maxFreq = ((Number) rows.get(0)[1]).doubleValue();
+            List<String> ids = rows.stream().map(r -> (String) r[0]).collect(Collectors.toList());
+            Map<String, Product> productMap = productRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(Product::getProductId, p -> p));
+
+            List<RecommendationDTO> alsoBought = new ArrayList<>();
+            for (Object[] row : rows) {
+                String pId = (String) row[0];
+                double freq = ((Number) row[1]).doubleValue();
+                Product p = productMap.get(pId);
+                if (p == null) continue;
+                RecommendationDTO dto = new RecommendationDTO(p);
+                dto.setSimilarityScore(maxFreq > 0 ? freq / maxFreq : 0.0); // chuẩn hóa 0..1
+                dto.setRecommendationType("ALSO_BOUGHT");
+                alsoBought.add(dto);
+            }
+
+            // 4. Lưu cache (TTL 1 giờ) - UPSERT atomic, thread-safe
+            String json = objectMapper.writeValueAsString(alsoBought);
+            cacheWriter.put(cacheKey, json, LocalDateTime.now().plusHours(1));
+
+            return RecommendationResponse.success(
+                    alsoBought.stream().limit(limit).collect(Collectors.toList()),
+                    "ALSO_BOUGHT", "Khách hàng cũng mua");
+
+        } catch (Exception e) {
+            log.error("Lỗi khi tính toán 'Khách hàng cũng mua' cho sản phẩm: {}", productId, e);
+            return RecommendationResponse.empty("Không thể lấy danh sách khách hàng cũng mua");
         }
     }
 

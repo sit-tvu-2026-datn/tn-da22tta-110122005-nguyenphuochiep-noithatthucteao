@@ -2,10 +2,13 @@ package com.example.backend.service.impl;
 
 import com.example.backend.DTO.ChatRequest;
 import com.example.backend.DTO.ChatResponse;
+import com.example.backend.model.Category;
 import com.example.backend.model.Product;
+import com.example.backend.repository.CategoryRepository;
 import com.example.backend.repository.ProductRepository;
 import com.example.backend.service.ChatbotService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -16,10 +19,17 @@ import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,20 +46,27 @@ public class ChatbotServiceImpl implements ChatbotService {
 
     private final RestTemplate restTemplate;
     private final ProductRepository productRepository;
+    private final CategoryRepository categoryRepository;
 
     private final String FRONTEND_URL = "http://localhost:5173";
 
+    // Số sản phẩm tối đa được đưa vào context gửi cho AI (sau khi pre-filter)
+    private static final int MAX_PRODUCTS = 15;
+
     @Autowired
-    public ChatbotServiceImpl(RestTemplate restTemplate, ProductRepository productRepository) {
+    public ChatbotServiceImpl(@Qualifier("chatbotRestTemplate") RestTemplate restTemplate,
+            ProductRepository productRepository,
+            CategoryRepository categoryRepository) {
         this.restTemplate = restTemplate;
         this.productRepository = productRepository;
+        this.categoryRepository = categoryRepository;
     }
 
     @Override
     public ChatResponse getChatbotResponse(ChatRequest request) {
         try {
-            // 1. Lấy dữ liệu kho hàng (Context)
-            String productContext = getProductContextFromDB();
+            // 1. Lấy dữ liệu kho hàng (Context) — đã PRE-FILTER theo nhu cầu của khách
+            String productContext = getProductContextFromDB(request.getMessage(), request.getHistory());
 
             // 2. Headers
             HttpHeaders headers = new HttpHeaders();
@@ -251,15 +268,20 @@ public class ChatbotServiceImpl implements ChatbotService {
         }
     }
 
-    private String getProductContextFromDB() {
-        List<Product> products = productRepository.findAll();
+    private String getProductContextFromDB(String userMessage, List<Map<String, String>> history) {
+        // Chỉ lấy sản phẩm còn hàng (quantity > 0) thay vì findAll()
+        List<Product> products = productRepository.findProductsForChatbot();
         if (products.isEmpty())
             return "Kho đang cập nhật.";
+
+        // === PRE-FILTER: chỉ giữ lại sản phẩm liên quan tới nhu cầu của khách ===
+        String searchText = buildSearchText(userMessage, history);
+        List<Product> relevant = filterRelevantProducts(searchText, products);
 
         // !!! QUAN TRỌNG: Thay đổi domain này thành domain thật của server chứa ảnh
         String IMAGE_BASE_URL = "http://localhost:8080";
 
-        return products.stream()
+        return relevant.stream()
                 .map(p -> {
                     String productLink = FRONTEND_URL + "/product/" + p.getProductId();
 
@@ -306,8 +328,214 @@ public class ChatbotServiceImpl implements ChatbotService {
                             priceTxt,
                             productLink,
                             finalImgUrl,
-                            p.getDescription());
+                            truncate(p.getDescription(), 150));
                 })
                 .collect(Collectors.joining("\n"));
+    }
+
+    // ====================================================================
+    // ===================  PRE-FILTER SẢN PHẨM  ==========================
+    // ====================================================================
+
+    /**
+     * Ghép câu hỏi hiện tại với vài câu hỏi gần nhất của khách (trong history)
+     * để giữ ngữ cảnh cho các câu hỏi nối tiếp (vd: "rẻ hơn không?", "mẫu khác đi").
+     * Câu hỏi hiện tại đặt đầu chuỗi để có trọng số cao nhất khi tách token.
+     */
+    private String buildSearchText(String userMessage, List<Map<String, String>> history) {
+        StringBuilder sb = new StringBuilder(userMessage == null ? "" : userMessage);
+        if (history != null && !history.isEmpty()) {
+            int count = 0;
+            for (int i = history.size() - 1; i >= 0 && count < 3; i--) {
+                Map<String, String> h = history.get(i);
+                if (h != null && "user".equals(h.get("role")) && h.get("content") != null) {
+                    sb.append(" ").append(h.get("content"));
+                    count++;
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Lọc và xếp hạng sản phẩm theo độ liên quan với nhu cầu khách hàng.
+     * Match trên: tên sản phẩm, tên danh mục, chất liệu, màu sắc, mô tả.
+     * Có mở rộng theo loại phòng và lọc theo ngân sách.
+     */
+    private List<Product> filterRelevantProducts(String searchText, List<Product> products) {
+        String norm = normalize(searchText);
+
+        // 1. Ngân sách (giá tối đa) nếu khách có nhắc tới
+        BigDecimal budget = extractBudget(norm);
+
+        // 2. Tập từ khóa: token có nghĩa từ câu hỏi + từ khóa mở rộng theo loại phòng
+        Set<String> tokens = extractTokens(norm);
+        Set<String> roomKeywords = expandRoomKeywords(norm, searchText.toLowerCase());
+
+        // 3. Map categoryId -> tên danh mục (đã chuẩn hóa) để match từ khóa danh mục
+        Map<String, String> categoryNames = new HashMap<>();
+        for (Category c : categoryRepository.findAll()) {
+            if (c.getCategoryId() != null) {
+                categoryNames.put(c.getCategoryId(), normalize(c.getCategoryName()));
+            }
+        }
+
+        // 4. Chấm điểm từng sản phẩm
+        List<ScoredProduct> scored = new ArrayList<>();
+        for (Product p : products) {
+            // Loại sản phẩm vượt ngân sách (cho phép sai số 20%)
+            if (budget != null && p.getPrice() != null
+                    && p.getPrice().compareTo(budget.multiply(BigDecimal.valueOf(1.2))) > 0) {
+                continue;
+            }
+
+            String haystackName = normalize(p.getProductName());
+            String catName = p.getCategoryId() != null ? categoryNames.getOrDefault(p.getCategoryId(), "") : "";
+            String haystackOther = normalize(
+                    (catName + " " + safe(p.getMaterial()) + " " + safe(p.getColor()) + " " + safe(p.getDescription())));
+
+            int score = 0;
+            // Từ khóa loại phòng (trọng số cao)
+            for (String kw : roomKeywords) {
+                if (haystackName.contains(kw))
+                    score += 5;
+                else if (haystackOther.contains(kw))
+                    score += 3;
+            }
+            // Token từ câu hỏi
+            for (String t : tokens) {
+                if (haystackName.contains(t))
+                    score += 4;
+                else if (haystackOther.contains(t))
+                    score += 1;
+            }
+            // Thưởng điểm nếu nằm trong ngân sách
+            if (budget != null && p.getPrice() != null && p.getPrice().compareTo(budget) <= 0) {
+                score += 2;
+            }
+
+            scored.add(new ScoredProduct(p, score));
+        }
+
+        // 5. Nếu không có sản phẩm nào khớp từ khóa (câu hỏi chung chung) -> fallback:
+        //    trả về danh sách (đã lọc ngân sách), ưu tiên giá thấp.
+        boolean anyMatch = scored.stream().anyMatch(s -> s.score > 0);
+
+        Comparator<ScoredProduct> cmp = anyMatch
+                ? Comparator.comparingInt((ScoredProduct s) -> s.score).reversed()
+                        .thenComparing(s -> nullToMax(s.product.getPrice()))
+                : Comparator.comparing(s -> nullToMax(s.product.getPrice()));
+
+        return scored.stream()
+                .sorted(cmp)
+                .limit(MAX_PRODUCTS)
+                .map(s -> s.product)
+                .collect(Collectors.toList());
+    }
+
+    /** Bỏ dấu tiếng Việt, đưa về chữ thường để so khớp ổn định. */
+    private String normalize(String s) {
+        if (s == null)
+            return "";
+        String lower = s.toLowerCase();
+        String temp = Normalizer.normalize(lower, Normalizer.Form.NFD);
+        temp = temp.replaceAll("\\p{M}+", "");
+        return temp.replace("đ", "d");
+    }
+
+    private static final Set<String> STOPWORDS = new java.util.HashSet<>(Arrays.asList(
+            "tim", "kiem", "can", "muon", "mua", "cho", "toi", "minh", "co", "khong", "gia",
+            "khoang", "voi", "va", "hay", "la", "duoi", "tren", "phong", "met", "vuong",
+            "ngan", "nghin", "trieu", "ty", "tr", "cai", "chiec", "nhu", "nao", "gi", "ve",
+            "them", "mot", "hai", "ba", "bon", "nam", "loai", "mau", "sac", "kich", "thuoc",
+            "size", "dang", "hien", "tai", "giup", "em", "anh", "chi", "shop", "noi", "that"));
+
+    /** Tách câu hỏi thành các token có nghĩa (bỏ stopword, số thuần, token quá ngắn). */
+    private Set<String> extractTokens(String norm) {
+        Set<String> tokens = new LinkedHashSet<>();
+        for (String raw : norm.split("[^a-z0-9]+")) {
+            if (raw.length() < 2)
+                continue;
+            if (raw.matches("\\d+"))
+                continue;
+            if (STOPWORDS.contains(raw))
+                continue;
+            tokens.add(raw);
+        }
+        return tokens;
+    }
+
+    /**
+     * Mở rộng từ khóa theo loại phòng mà khách nhắc tới.
+     * Dùng {@code raw} (chuỗi còn dấu, đã lowercase) để phân biệt "tư vấn" với "văn phòng"
+     * — vì khi bỏ dấu, "tư vấn" -> "tu van" rất dễ trùng "văn phòng" -> "van phong".
+     */
+    private Set<String> expandRoomKeywords(String norm, String raw) {
+        Set<String> kws = new LinkedHashSet<>();
+        if (norm.contains("phong khach") || norm.contains("khach")) {
+            kws.addAll(Arrays.asList("sofa", "ban tra", "ke tv", "ke ti vi", "tham", "den"));
+        }
+        if (norm.contains("phong ngu") || raw.contains("ngủ")) {
+            kws.addAll(Arrays.asList("giuong", "nem", "dem", "tab dau giuong", "tu quan ao", "ban trang diem"));
+        }
+        if (norm.contains("bep") || norm.contains("an uong") || norm.contains("nha bep")) {
+            kws.addAll(Arrays.asList("ban an", "ghe an", "tu bep", "ke bep"));
+        }
+        // Chỉ kích hoạt "phòng làm việc" khi khách thực sự nhắc tới — dựa trên chuỗi CÒN DẤU
+        if (raw.contains("làm việc") || raw.contains("văn phòng") || raw.contains("học")) {
+            kws.addAll(Arrays.asList("ban lam viec", "ban hoc", "ghe", "ke sach", "tu sach"));
+        }
+        return kws;
+    }
+
+    /** Trích ngân sách (giá tối đa, đơn vị VNĐ) từ câu hỏi đã chuẩn hóa. */
+    private BigDecimal extractBudget(String norm) {
+        // Bắt: số (có thể kèm dấu , hoặc .) + đơn vị: ty / trieu / tr / nghin / ngan / k
+        Matcher m = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(ty|trieu|tr|nghin|ngan|k)\\b").matcher(norm);
+        if (m.find()) {
+            double value = Double.parseDouble(m.group(1).replace(",", "."));
+            String unit = m.group(2);
+            double multiplier;
+            switch (unit) {
+                case "ty":
+                    multiplier = 1_000_000_000d;
+                    break;
+                case "trieu":
+                case "tr":
+                    multiplier = 1_000_000d;
+                    break;
+                default: // nghin / ngan / k
+                    multiplier = 1_000d;
+                    break;
+            }
+            return BigDecimal.valueOf(value * multiplier);
+        }
+        return null;
+    }
+
+    private String truncate(String s, int max) {
+        if (s == null)
+            return "";
+        s = s.replaceAll("\\s+", " ").trim();
+        return s.length() <= max ? s : s.substring(0, max) + "...";
+    }
+
+    private String safe(String s) {
+        return s == null ? "" : s;
+    }
+
+    private BigDecimal nullToMax(BigDecimal price) {
+        return price == null ? BigDecimal.valueOf(Long.MAX_VALUE) : price;
+    }
+
+    /** Sản phẩm kèm điểm liên quan, dùng nội bộ khi xếp hạng. */
+    private static class ScoredProduct {
+        final Product product;
+        final int score;
+
+        ScoredProduct(Product product, int score) {
+            this.product = product;
+            this.score = score;
+        }
     }
 }

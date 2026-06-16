@@ -34,16 +34,16 @@ export default function MainMenu() {
   };
 
   return (
-    <nav className="bg-white border-b border-gray-100 relative z-40">
+    <nav className="bg-transparent relative z-40 font-montserrat">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-12">
+        <div className="flex items-center justify-between h-10">
           {/* Mobile Toggle */}
           <button
-            className="lg:hidden flex items-center gap-2 text-gray-800"
+            className="lg:hidden flex items-center gap-2 text-white/60 hover:text-champagne transition-colors"
             onClick={() => setIsMobileOpen(!isMobileOpen)}
           >
-            {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
-            <span className="uppercase text-sm font-medium tracking-wide">
+            {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
+            <span className="uppercase text-[10px] font-semibold tracking-[0.2em]">
               Danh mục
             </span>
           </button>
@@ -51,29 +51,29 @@ export default function MainMenu() {
           {/* Desktop Menu */}
           <div className="hidden lg:flex items-center">
             {menus.map((menu, i) => (
-              <div key={i} className="relative group h-12 flex items-center">
+              <div key={i} className="relative group h-10 flex items-center">
                 {menu.dropdown ? (
                   <>
                     <Link
                       to={menu.path}
-                      className={`flex items-center gap-1 px-4 h-full text-sm font-semibold uppercase tracking-wide border-b-2 transition-all
+                      className={`flex items-center gap-1.5 px-5 h-full text-[11px] font-semibold uppercase tracking-[0.18em] border-b transition-all duration-300
                         ${
                           isActive(menu.path)
-                            ? "text-blue-600 border-blue-600"
-                            : "text-gray-700 border-transparent hover:text-blue-600 hover:border-blue-400"
+                            ? "text-champagne border-champagne"
+                            : "text-white/50 border-transparent hover:text-white hover:border-champagne/40"
                         }`}
                     >
                       {menu.name}
-                      <ChevronDown size={14} />
+                      <ChevronDown size={12} strokeWidth={1.5} className="transition-transform duration-200 group-hover:rotate-180" />
                     </Link>
 
                     {/* Desktop Dropdown */}
                     <div
                       className="
                         absolute top-full left-0
-                        w-64 bg-white
-                        shadow-xl border border-gray-100
-                        rounded-b-xl
+                        w-60 bg-nero
+                        border border-champagne/15
+                        shadow-[0_20px_50px_rgba(0,0,0,0.5)]
                         opacity-0 invisible
                         group-hover:opacity-100
                         group-hover:visible
@@ -83,17 +83,17 @@ export default function MainMenu() {
                         z-50
                       "
                     >
-                      <div className="py-2">
+                      <div className="py-1.5">
                         {categories.map((cat) => (
                           <Link
                             key={cat.categoryId}
                             to={`/products?category=${cat.categoryId}`}
                             className="
-                              block px-5 py-3
-                              text-sm text-gray-600
-                              hover:bg-gray-50
-                              hover:text-blue-600
-                              transition
+                              block px-5 py-2.5
+                              text-[11px] font-medium text-white/50 uppercase tracking-[0.12em]
+                              hover:bg-champagne/10
+                              hover:text-champagne
+                              transition-colors duration-200
                             "
                           >
                             {cat.categoryName}
@@ -105,11 +105,11 @@ export default function MainMenu() {
                 ) : (
                   <Link
                     to={menu.path}
-                    className={`px-4 h-full flex items-center text-sm font-semibold uppercase tracking-wide border-b-2 transition-all
+                    className={`px-5 h-full flex items-center text-[11px] font-semibold uppercase tracking-[0.18em] border-b transition-all duration-300
                       ${
                         isActive(menu.path)
-                          ? "text-blue-600 border-blue-600"
-                          : "text-gray-700 border-transparent hover:text-blue-600 hover:border-blue-400"
+                          ? "text-champagne border-champagne"
+                          : "text-white/50 border-transparent hover:text-white hover:border-champagne/40"
                       }`}
                   >
                     {menu.name}
@@ -119,7 +119,7 @@ export default function MainMenu() {
             ))}
 
             {/* Divider */}
-            <div className="w-px h-5 bg-gray-200 mx-5" />
+            <div className="w-px h-4 bg-champagne/15 mx-4" />
 
             {/* Room Planner */}
             <div
@@ -131,30 +131,17 @@ export default function MainMenu() {
                 to="/room-planner"
                 className="
                   relative flex items-center gap-2
-                  px-4 h-8
-                  rounded-lg overflow-hidden
-                  text-white text-sm font-bold
-                  transition-all duration-200
+                  px-5 h-8
+                  overflow-hidden
+                  text-nero text-[10px] font-bold uppercase tracking-[0.15em]
+                  bg-champagne
+                  transition-all duration-300
+                  hover:shadow-[0_0_25px_rgba(200,169,110,0.3)]
                   hover:-translate-y-0.5
                 "
-                style={{
-                  background:
-                    "linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 58%,#0ea5e9 100%)",
-                  boxShadow: hoveredPlanner
-                    ? "0 4px 18px rgba(29,78,216,.45)"
-                    : "0 2px 10px rgba(29,78,216,.30)",
-                }}
               >
-                <span
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      "linear-gradient(135deg,rgba(255,255,255,.13),transparent 55%)",
-                  }}
-                />
-
                 <svg
-                  className="w-4 h-4 relative z-10"
+                  className="w-3.5 h-3.5 relative z-10"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -167,18 +154,17 @@ export default function MainMenu() {
                 <span className="relative z-10">Thử Nội Thất</span>
 
                 <span
-                  className="relative z-10 text-[10px] font-extrabold px-1.5 py-0.5 rounded"
+                  className="relative z-10 text-[8px] font-extrabold px-1.5 py-0.5"
                   style={{
-                    background: "rgba(255,255,255,.18)",
-                    border: "1px solid rgba(255,255,255,.25)",
-                    color: "#bae6fd",
+                    background: "rgba(10,10,10,.15)",
+                    border: "1px solid rgba(10,10,10,.2)",
                   }}
                 >
                   3D
                 </span>
 
                 <span
-                  className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-400"
+                  className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-400"
                   style={{
                     animation: "rp-pulse 1.8s ease-in-out infinite",
                   }}
@@ -189,12 +175,14 @@ export default function MainMenu() {
               <div
                 className={`
                   absolute left-1/2 -translate-x-1/2
-                  top-11
-                  bg-gray-900 text-white
-                  text-xs px-3 py-2
-                  rounded-lg whitespace-nowrap
+                  top-10
+                  bg-nero text-champagne
+                  text-[10px] font-medium px-3 py-2
+                  whitespace-nowrap
+                  border border-champagne/15
                   transition-opacity duration-200
                   pointer-events-none
+                  tracking-wide
                   ${hoveredPlanner ? "opacity-100" : "opacity-0"}
                 `}
               >
@@ -212,15 +200,15 @@ export default function MainMenu() {
             lg:hidden
             absolute top-full left-0
             w-full
-            bg-white
-            border-t border-gray-200
-            shadow-2xl
+            bg-nero
+            border-t border-champagne/10
+            shadow-[0_20px_50px_rgba(0,0,0,0.5)]
             z-50
             max-h-[calc(100vh-120px)]
             overflow-y-auto
           "
         >
-          <div className="p-4 space-y-1">
+          <div className="p-5 space-y-1">
             {menus.map((menu, i) => (
               <div key={i}>
                 {menu.dropdown ? (
@@ -229,37 +217,39 @@ export default function MainMenu() {
                       onClick={() => setMobileSubOpen(!mobileSubOpen)}
                       className="
                         w-full flex items-center justify-between
-                        px-3 py-3
-                        rounded-lg
-                        hover:bg-gray-50
-                        font-medium
-                        text-gray-800
+                        px-4 py-3
+                        font-semibold text-xs uppercase tracking-[0.15em]
+                        text-white/60
+                        hover:text-champagne
+                        transition-colors
                       "
                     >
                       {menu.name}
 
                       <ChevronDown
-                        size={18}
-                        className={`transition-transform ${
+                        size={14}
+                        strokeWidth={1.5}
+                        className={`transition-transform duration-200 ${
                           mobileSubOpen ? "rotate-180" : ""
                         }`}
                       />
                     </button>
 
                     {mobileSubOpen && (
-                      <div className="ml-4 mb-2 bg-gray-50 rounded-lg p-2">
+                      <div className="ml-4 mb-2 border-l border-champagne/10 pl-4">
                         {categories.map((cat) => (
                           <Link
                             key={cat.categoryId}
                             to={`/products?category=${cat.categoryId}`}
                             onClick={() => setIsMobileOpen(false)}
                             className="
-                              block py-2 px-2
-                              text-sm text-gray-600
-                              hover:text-blue-600
+                              block py-2.5
+                              text-[11px] font-medium text-white/40 uppercase tracking-[0.1em]
+                              hover:text-champagne
+                              transition-colors
                             "
                           >
-                            • {cat.categoryName}
+                            {cat.categoryName}
                           </Link>
                         ))}
                       </div>
@@ -269,13 +259,12 @@ export default function MainMenu() {
                   <Link
                     to={menu.path}
                     onClick={() => setIsMobileOpen(false)}
-                    className="
-                      block px-3 py-3
-                      rounded-lg
-                      font-medium
-                      text-gray-800
-                      hover:bg-gray-50
-                    "
+                    className={`
+                      block px-4 py-3
+                      font-semibold text-xs uppercase tracking-[0.15em]
+                      transition-colors
+                      ${isActive(menu.path) ? "text-champagne" : "text-white/60 hover:text-champagne"}
+                    `}
                   >
                     {menu.name}
                   </Link>
@@ -283,22 +272,32 @@ export default function MainMenu() {
               </div>
             ))}
 
+            {/* Divider */}
+            <div className="h-px bg-champagne/10 my-3" />
+
             {/* Mobile Room Planner */}
             <Link
               to="/room-planner"
               onClick={() => setIsMobileOpen(false)}
               className="
-                mt-4
                 flex items-center justify-center gap-2
-                py-3 rounded-xl
-                text-white font-semibold
+                py-3
+                text-nero text-xs font-bold uppercase tracking-[0.15em]
+                bg-champagne
+                transition-all duration-300
+                hover:shadow-[0_0_25px_rgba(200,169,110,0.3)]
               "
-              style={{
-                background:
-                  "linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 58%,#0ea5e9 100%)",
-              }}
             >
-              🏠
+              <svg
+                className="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+              >
+                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+                <rect x="9" y="13" width="6" height="8" rx="0.8" />
+              </svg>
               <span>Thử Nội Thất 3D</span>
             </Link>
           </div>

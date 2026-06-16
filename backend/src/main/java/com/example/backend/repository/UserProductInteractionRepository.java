@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -50,4 +51,13 @@ public interface UserProductInteractionRepository extends JpaRepository<UserProd
      * Xóa tương tác của người dùng với sản phẩm theo loại tương tác.
      */
     void deleteByUserIdAndProductIdAndInteractionType(String userId, String productId, String interactionType);
+
+    /**
+     * Đếm số lượt tương tác theo loại trong một khung thời gian (phục vụ Trending).
+     * Trả về danh sách [productId, count].
+     */
+    @Query("SELECT u.productId, COUNT(u) FROM UserProductInteraction u " +
+            "WHERE u.interactionType = :type AND u.updatedAt >= :since " +
+            "GROUP BY u.productId")
+    List<Object[]> countByTypeSince(@Param("type") String type, @Param("since") LocalDateTime since);
 }

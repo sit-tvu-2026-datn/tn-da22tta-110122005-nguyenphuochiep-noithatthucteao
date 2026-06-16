@@ -28,8 +28,11 @@ public class RecommendationDTO {
     private String categoryName;
     private String color;
     private String material;
+    private String origin; // Xuất xứ - dùng cho User Preference Profile
     private double similarityScore; // Điểm tương quan/tương đồng (0.0 -> 1.0)
-    private String recommendationType; // CONTENT_BASED, COLLABORATIVE, HYBRID, POPULAR
+    private Double averageRating; // Điểm đánh giá trung bình (phục vụ Top Rated)
+    private Integer reviewCount; // Số lượt đánh giá (phục vụ Top Rated)
+    private String recommendationType; // CONTENT_BASED, COLLABORATIVE, HYBRID, POPULAR, FOR_YOU, TRENDING, TOP_RATED, ALSO_BOUGHT
 
     /**
      * Constructor chuyển đổi từ thực thể Product.
@@ -53,5 +56,6 @@ public class RecommendationDTO {
         }
         this.color = product.getColor();
         this.material = product.getMaterial();
+        this.origin = product.getOrigin();
     }
 }

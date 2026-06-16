@@ -32,6 +32,7 @@ public class ContentBasedServiceImpl implements ContentBasedService {
 
     private final ProductRepository productRepository;
     private final RecommendationCacheRepository cacheRepository;
+    private final RecommendationCacheWriter cacheWriter;
     private final ObjectMapper objectMapper;
 
     // Bộ nhớ đệm TF-IDF vector trên RAM để tính toán nhanh hơn
@@ -110,17 +111,9 @@ public class ContentBasedServiceImpl implements ContentBasedService {
             // Lưu toàn bộ danh sách gợi ý vào Cache DB (tối đa 20 sản phẩm để lưu trữ)
             List<RecommendationDTO> cacheList = allRecommendations.stream().limit(20).collect(Collectors.toList());
             String jsonCache = objectMapper.writeValueAsString(cacheList);
-            
-            // Xóa cache cũ nếu có
-            cacheRepository.findByCacheKey(cacheKey).ifPresent(cacheRepository::delete);
-            
-            // Lưu cache mới hết hạn sau 2 giờ
-            RecommendationCache newCache = RecommendationCache.builder()
-                    .cacheKey(cacheKey)
-                    .recommendationData(jsonCache)
-                    .expiresAt(LocalDateTime.now().plusHours(2))
-                    .build();
-            cacheRepository.save(newCache);
+
+            // Lưu cache mới hết hạn sau 2 giờ (UPSERT atomic, thread-safe)
+            cacheWriter.put(cacheKey, jsonCache, LocalDateTime.now().plusHours(2));
 
             // Trả về số lượng theo yêu cầu limit
             List<RecommendationDTO> resultList = allRecommendations.stream().limit(limit).collect(Collectors.toList());

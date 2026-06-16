@@ -17,9 +17,10 @@ import Cookies from "js-cookie";
 export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  // --- THÊM STATE CHO HIỆU ỨNG CUỘN ---
+  // --- STATE CHO HIỆU ỨNG CUỘN ---
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const { cartCount, refreshCartCount, resetCartCount } =
     useContext(CartContext);
@@ -49,10 +50,13 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [user]);
 
-  // --- THÊM USEEFFECT XỬ LÝ SỰ KIỆN SCROLL ---
+  // --- USEEFFECT XỬ LÝ SỰ KIỆN SCROLL ---
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
+
+      // Theo dõi đã scroll chưa để đổi background
+      setIsScrolled(currentScrollY > 20);
 
       // Nếu ở sát trên cùng thì luôn hiện (tránh giật lag ở top)
       if (currentScrollY < 10) {
@@ -99,71 +103,95 @@ export default function Header() {
 
   return (
     <header
-      className={`bg-white border-b border-gray-200 fixed top-0 w-full z-50 shadow-sm transition-transform duration-300 ease-in-out ${
+      className={`fixed top-0 w-full z-50 transition-all duration-500 ease-in-out font-montserrat ${
         isVisible ? "translate-y-0" : "-translate-y-full"
+      } ${
+        isScrolled
+          ? "bg-nero/95 backdrop-blur-md shadow-[0_1px_0_rgba(200,169,110,0.1)]"
+          : "bg-nero/80 backdrop-blur-sm"
       }`}
     >
       {contextHolder}
 
       {/* TẦNG 1: LOGO - SEARCH - ACTIONS */}
-      <div className="border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+      <div className="border-b border-champagne/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-[72px] flex items-center justify-between gap-4">
           {/* Logo */}
           <Link
             to="/"
-            className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tighter shrink-0"
+            className="shrink-0 flex items-center gap-1"
           >
-            NPH <span className="text-blue-600">STORE</span>
+            <span className="text-xl sm:text-2xl font-extrabold text-white tracking-[0.02em] uppercase">
+              NPH
+            </span>
+            <span className="text-xl sm:text-2xl font-extrabold text-champagne tracking-[0.02em] uppercase">
+              STORE
+            </span>
           </Link>
 
           {/* Search Bar */}
-          <div className="hidden md:flex flex-1 max-w-lg mx-auto relative">
+          <div className="hidden md:flex flex-1 max-w-md mx-auto relative">
             <input
               type="text"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Tìm kiếm ghế sofa, bàn ăn..."
-              className="w-full pl-10 pr-12 py-2.5 bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm"
+              placeholder="Tìm kiếm sản phẩm..."
+              className="w-full pl-10 pr-12 py-2.5 bg-white/[0.06] border border-champagne/15 text-white placeholder-white/30 text-sm font-light tracking-wide focus:outline-none focus:border-champagne/40 focus:bg-white/[0.09] transition-all duration-300"
             />
             <button
               onClick={handleSearch}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-200 rounded-full transition-colors text-gray-500"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/10 rounded-sm transition-colors text-white/50 hover:text-champagne"
             >
-              <Search size={18} />
+              <Search size={16} />
             </button>
             <Search
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              size={18}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none"
+              size={16}
             />
           </div>
 
           {/* Actions: Cart & User */}
-          <div className="flex items-center gap-3 sm:gap-5 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            {/* Mobile search */}
+            <button
+              onClick={() => navigate("/products")}
+              className="md:hidden p-2 text-white/60 hover:text-champagne transition-colors"
+            >
+              <Search size={20} />
+            </button>
+
+            {/* Cart */}
             <button
               onClick={() => navigate("/cart")}
-              className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-full transition group"
+              className="relative p-2 text-white/70 hover:text-champagne transition-colors group"
             >
               <ShoppingCart
-                size={24}
-                className="group-hover:text-blue-600 transition"
+                size={22}
+                strokeWidth={1.5}
+                className="transition-colors"
               />
-              <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold h-5 w-5 flex items-center justify-center rounded-full border-2 border-white">
-                {cartCount > 99 ? "99+" : cartCount}
-              </span>
+              {cartCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-champagne text-nero text-[9px] font-bold h-[18px] min-w-[18px] flex items-center justify-center px-1">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
             </button>
+
+            {/* Divider */}
+            <div className="w-px h-5 bg-champagne/15" />
 
             {!isLoggedIn ? (
               <div className="flex items-center gap-2">
                 <Link
                   to="/login"
-                  className="hidden sm:block text-sm font-semibold text-gray-700 hover:text-blue-600 px-2"
+                  className="hidden sm:block text-xs font-semibold text-white/60 hover:text-champagne uppercase tracking-[0.1em] px-2 transition-colors"
                 >
                   Đăng nhập
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-blue-600 text-white text-sm font-bold px-4 py-2 rounded-full hover:bg-blue-700 transition shadow-sm"
+                  className="bg-champagne text-nero text-xs font-bold px-5 py-2 uppercase tracking-[0.1em] hover:shadow-[0_0_20px_rgba(200,169,110,0.25)] transition-all duration-300"
                 >
                   Đăng ký
                 </Link>
@@ -172,9 +200,9 @@ export default function Header() {
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-2 p-1 pr-3 rounded-full border border-gray-200 hover:shadow-md transition bg-white"
+                  className="flex items-center gap-2.5 p-1 pr-3 border border-champagne/15 hover:border-champagne/30 transition-all bg-white/[0.04] hover:bg-white/[0.08]"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="w-7 h-7 bg-champagne/10 overflow-hidden">
                     {user.avatar ? (
                       <img
                         src={user.avatar}
@@ -182,52 +210,57 @@ export default function Header() {
                         alt="avatar"
                       />
                     ) : (
-                      <User className="p-1.5 w-full h-full text-gray-400" />
+                      <User className="p-1 w-full h-full text-champagne/60" />
                     )}
                   </div>
-                  <span className="hidden sm:block text-sm font-semibold text-gray-700 max-w-[80px] truncate">
+                  <span className="hidden sm:block text-xs font-medium text-white/70 max-w-[80px] truncate tracking-wide">
                     {user.fullName}
                   </span>
                 </button>
 
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-3 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
-                    <div className="px-5 py-3 border-b border-gray-50 bg-gray-50/50">
-                      <p className="font-bold text-gray-800 truncate">
+                  <div className="absolute right-0 mt-2 w-64 bg-nero border border-champagne/15 shadow-[0_20px_60px_rgba(0,0,0,0.5)] py-1.5 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                    {/* User Info */}
+                    <div className="px-5 py-3 border-b border-champagne/10">
+                      <p className="font-semibold text-white text-sm truncate">
                         {user.fullName}
                       </p>
-                      <p className="text-xs text-gray-500 truncate">
+                      <p className="text-[11px] text-white/35 truncate mt-0.5 tracking-wide">
                         {user.email}
                       </p>
                     </div>
+
+                    {/* Menu Items */}
                     <div className="py-1">
                       {user.role === "ADMIN" && (
                         <Link
                           to="/admin"
-                          className="px-5 py-2.5 flex items-center gap-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                          className="px-5 py-2.5 flex items-center gap-3 text-xs font-medium text-white/60 hover:bg-champagne/10 hover:text-champagne transition-colors uppercase tracking-[0.08em]"
                         >
-                          <Shield size={16} /> Trang quản trị
+                          <Shield size={14} strokeWidth={1.5} /> Trang quản trị
                         </Link>
                       )}
                       <Link
                         to="/purchase"
-                        className="px-5 py-2.5 flex items-center gap-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                        className="px-5 py-2.5 flex items-center gap-3 text-xs font-medium text-white/60 hover:bg-champagne/10 hover:text-champagne transition-colors uppercase tracking-[0.08em]"
                       >
-                        <ShoppingCart size={16} /> Đơn mua hàng
+                        <ShoppingCart size={14} strokeWidth={1.5} /> Đơn mua hàng
                       </Link>
                       <Link
                         to="/edit-profile"
-                        className="px-5 py-2.5 flex items-center gap-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                        className="px-5 py-2.5 flex items-center gap-3 text-xs font-medium text-white/60 hover:bg-champagne/10 hover:text-champagne transition-colors uppercase tracking-[0.08em]"
                       >
-                        <Settings size={16} /> Cài đặt tài khoản
+                        <Settings size={14} strokeWidth={1.5} /> Cài đặt tài khoản
                       </Link>
                     </div>
-                    <div className="border-t border-gray-100 mt-1 py-1">
+
+                    {/* Logout */}
+                    <div className="border-t border-champagne/10 mt-1 py-1">
                       <button
                         onClick={handleLogout}
-                        className="w-full text-left px-5 py-2.5 flex items-center gap-3 text-sm text-red-600 hover:bg-red-50 font-medium"
+                        className="w-full text-left px-5 py-2.5 flex items-center gap-3 text-xs font-medium text-red-400/80 hover:bg-red-500/10 hover:text-red-400 transition-colors uppercase tracking-[0.08em]"
                       >
-                        <LogOut size={16} /> Đăng xuất
+                        <LogOut size={14} strokeWidth={1.5} /> Đăng xuất
                       </button>
                     </div>
                   </div>

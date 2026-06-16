@@ -18,6 +18,15 @@ public interface CollaborativeFilteringService {
     RecommendationResponse getCollaborativeRecommendations(String userId, int limit);
 
     /**
+     * Lấy danh sách sản phẩm thường được mua chung với một sản phẩm ("Khách hàng cũng mua").
+     * Dựa trên co-occurrence trong cùng đơn hàng; fallback về Content-Based nếu thiếu dữ liệu.
+     *
+     * @param productId Mã sản phẩm đang xem
+     * @param limit     Số lượng gợi ý tối đa
+     */
+    RecommendationResponse getAlsoBought(String productId, int limit);
+
+    /**
      * Xóa các cache tính toán lọc cộng tác.
      */
     void invalidateCache();

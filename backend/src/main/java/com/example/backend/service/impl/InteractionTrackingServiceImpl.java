@@ -6,6 +6,7 @@ import com.example.backend.repository.ProductViewHistoryRepository;
 import com.example.backend.repository.RecommendationCacheRepository;
 import com.example.backend.repository.UserProductInteractionRepository;
 import com.example.backend.service.InteractionTrackingService;
+import com.example.backend.service.UserPreferenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ public class InteractionTrackingServiceImpl implements InteractionTrackingServic
     private final ProductViewHistoryRepository viewHistoryRepository;
     private final UserProductInteractionRepository interactionRepository;
     private final RecommendationCacheRepository cacheRepository;
+    private final UserPreferenceService userPreferenceService;
 
     @Override
     @Transactional
@@ -181,16 +183,21 @@ public class InteractionTrackingServiceImpl implements InteractionTrackingServic
     }
 
     /**
-     * Làm mới cache gợi ý của người dùng (xóa các khóa cache liên quan trên Database).
+     * Làm mới cache gợi ý của người dùng (xóa các khóa cache liên quan trên Database)
+     * và xóa hồ sơ sở thích để buộc tính lại theo tương tác mới nhất.
      */
     private void invalidateUserCaches(String userId) {
         String collabKey = "collaborative:" + userId;
         String hybridKey = "hybrid:" + userId;
-        
+        String forYouKey = "foryou:" + userId;
+
         try {
             cacheRepository.findByCacheKey(collabKey).ifPresent(cacheRepository::delete);
             cacheRepository.findByCacheKey(hybridKey).ifPresent(cacheRepository::delete);
-            log.info("Đã xóa cache DB cũ cho user {}", userId);
+            cacheRepository.findByCacheKey(forYouKey).ifPresent(cacheRepository::delete);
+            // Xóa hồ sơ sở thích để lần gợi ý kế tiếp xây lại từ dữ liệu mới
+            userPreferenceService.invalidateProfile(userId);
+            log.info("Đã xóa cache DB + hồ sơ sở thích cũ cho user {}", userId);
         } catch (Exception e) {
             log.error("Lỗi khi xóa cache DB của user {}", userId, e);
         }

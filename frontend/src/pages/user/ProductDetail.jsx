@@ -24,6 +24,7 @@ import { CartContext } from "../../context/CartContext";
 import "@google/model-viewer";
 import api from "../../config/api";
 import SimilarProducts from "../../components/SimilarProducts";
+import RecommendationCarousel from "../../components/recommend/RecommendationCarousel";
 
 
 const LUXURY_EASE = [0.22, 1, 0.36, 1];
@@ -154,14 +155,14 @@ function getProductPriceInfo(product, flashSale) {
 
 function ProductDetailSkeleton() {
   return (
-    <main className="min-h-screen bg-white px-5 py-10">
+    <main className="min-h-screen bg-gradient-to-b from-ivory via-white to-whisper/40 px-5 py-10 font-montserrat">
       <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="aspect-[4/5] animate-pulse rounded-[2rem] bg-white" />
+        <div className="aspect-[4/5] animate-pulse rounded-[2rem] bg-whisper/60" />
         <div className="space-y-6 pt-8">
-          <div className="h-4 w-32 animate-pulse rounded-full bg-white" />
-          <div className="h-16 w-4/5 animate-pulse rounded-2xl bg-white" />
-          <div className="h-6 w-48 animate-pulse rounded-full bg-white" />
-          <div className="h-28 animate-pulse rounded-3xl bg-white" />
+          <div className="h-4 w-32 animate-pulse rounded-full bg-whisper/60" />
+          <div className="h-16 w-4/5 animate-pulse rounded-2xl bg-whisper/60" />
+          <div className="h-6 w-48 animate-pulse rounded-full bg-whisper/60" />
+          <div className="h-28 animate-pulse rounded-3xl bg-whisper/60" />
         </div>
       </div>
     </main>
@@ -1102,9 +1103,9 @@ export default function ProductDetail() {
 
   if (!product) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-white px-5 text-center">
-        <p className="text-2xl font-light text-[#23231f]">Không tìm thấy sản phẩm.</p>
-        <button onClick={() => navigate("/")} className="mt-6 rounded-full bg-[#23231f] px-7 py-3 text-sm uppercase tracking-[0.18em] text-[#f8f6f2]">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-ivory to-whisper/40 px-5 text-center font-montserrat">
+        <p className="text-2xl font-light text-nero">Không tìm thấy sản phẩm.</p>
+        <button onClick={() => navigate("/")} className="mt-6 rounded-full bg-nero px-7 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-ivory transition hover:bg-champagne hover:text-nero">
           Về trang chủ
         </button>
       </main>
@@ -1112,11 +1113,11 @@ export default function ProductDetail() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-white text-[#24231f]">
+    <main className="min-h-screen overflow-hidden bg-gradient-to-b from-ivory via-white to-whisper/30 font-montserrat text-nero">
       <Toast toast={toast} onClose={() => setToast(null)} />
 
       <section className="relative">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[560px]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[560px] bg-gradient-to-b from-champagne/10 via-ivory/0 to-transparent" />
         <div className="relative mx-auto max-w-7xl px-5 pb-10 pt-8 sm:px-8 lg:pb-20">
           <motion.button
             type="button"
@@ -1199,6 +1200,16 @@ export default function ProductDetail() {
       />
 
       <SimilarProducts productId={productId} onAddToCart={handleAddToCart} />
+
+      {/* Khách hàng cũng mua — co-occurrence trong đơn hàng (fallback Content-Based) */}
+      <RecommendationCarousel
+        key={`also-bought-${productId}`}
+        title="Khách hàng cũng mua"
+        eyebrow="Thường được mua cùng"
+        icon={<ShoppingBag size={12} className="text-[#c4aa75]" />}
+        endpoint={`/api/recommend/also-bought/${productId}`}
+        limit={4}
+      />
 
       <RelatedProducts products={displayedRelatedProducts} onAddToCart={handleAddToCart} />
 

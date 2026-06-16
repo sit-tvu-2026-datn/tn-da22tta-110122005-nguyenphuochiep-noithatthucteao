@@ -9,11 +9,14 @@ import {
   ChevronRight,
   RefreshCw,
   Armchair,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import api from "../config/api";
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [inputMsg, setInputMsg] = useState("");
   const messagesEndRef = useRef(null);
@@ -254,7 +257,7 @@ export default function Chatbot() {
 
   return (
     <>
-      <div className={`fixed z-[9999] flex flex-col font-sans transition-all duration-300 origin-bottom-right ${isOpen ? "opacity-100 scale-100 translate-y-0 pointer-events-auto visible" : "opacity-0 scale-90 translate-y-10 pointer-events-none invisible"} bottom-0 right-0 w-full h-[100dvh] rounded-none sm:bottom-24 sm:right-6 sm:w-[400px] sm:h-[600px] sm:max-h-[80vh] sm:rounded-2xl shadow-2xl`}>
+      <div className={`fixed z-[9999] flex flex-col font-sans transition-all duration-300 origin-bottom-right ${isOpen ? "opacity-100 scale-100 translate-y-0 pointer-events-auto visible" : "opacity-0 scale-90 translate-y-10 pointer-events-none invisible"} bottom-0 right-0 w-full h-[100dvh] rounded-none ${isExpanded ? "sm:bottom-6 sm:right-6 sm:w-[700px] sm:h-[calc(100vh-3rem)] sm:max-h-[900px] sm:rounded-2xl" : "sm:bottom-24 sm:right-6 sm:w-[400px] sm:h-[600px] sm:max-h-[80vh] sm:rounded-2xl"} shadow-2xl`}>
         <div className="bg-white w-full h-full sm:rounded-2xl overflow-hidden flex flex-col shadow-xl border border-gray-200">
           <div className="bg-gradient-to-r from-blue-700 to-blue-600 p-4 flex justify-between items-center text-white shrink-0">
             <div className="flex items-center gap-3">
@@ -272,7 +275,8 @@ export default function Chatbot() {
               </div>
             </div>
             <div className="flex gap-1">
-              <button onClick={handleClearChat} className="hover:bg-white/20 p-2 rounded-lg transition-colors text-blue-100 hover:text-white"><RefreshCw size={18} /></button>
+              <button onClick={handleClearChat} title="Làm mới đoạn chat" className="hover:bg-white/20 p-2 rounded-lg transition-colors text-blue-100 hover:text-white"><RefreshCw size={18} /></button>
+              <button onClick={() => setIsExpanded((v) => !v)} title={isExpanded ? "Thu nhỏ" : "Mở rộng"} className="hidden sm:block hover:bg-white/20 p-2 rounded-lg transition-colors text-blue-100 hover:text-white">{isExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>
               <button onClick={() => setIsOpen(false)} className="hover:bg-red-500/80 p-2 rounded-lg transition-colors text-blue-100 hover:text-white"><X size={20} /></button>
             </div>
           </div>

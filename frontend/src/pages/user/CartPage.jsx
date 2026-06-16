@@ -332,13 +332,11 @@ export default function CartPage() {
                     <div
                       key={item.orderDetailId}
                       className={`group bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative 
-                        ${
-                          isOutOfStock
-                            ? "bg-gray-50 opacity-75 grayscale-[0.5]"
-                            : ""
+                        ${isOutOfStock
+                          ? "bg-gray-50 opacity-75 grayscale-[0.5]"
+                          : ""
                         } 
-                        ${
-                          isFlashSale ? "border-orange-200 bg-orange-50/10" : ""
+                        ${isFlashSale ? "border-orange-200 bg-orange-50/10" : ""
                         }
                       `}
                     >
@@ -380,11 +378,10 @@ export default function CartPage() {
                           <div>
                             <div className="flex justify-between items-start">
                               <h3
-                                className={`text-base sm:text-lg font-semibold line-clamp-2 pr-8 ${
-                                  isOutOfStock
-                                    ? "text-gray-500"
-                                    : "text-gray-800"
-                                }`}
+                                className={`text-base sm:text-lg font-semibold line-clamp-2 pr-8 ${isOutOfStock
+                                  ? "text-gray-500"
+                                  : "text-gray-800"
+                                  }`}
                               >
                                 {item.product.productName}
                               </h3>
@@ -443,11 +440,10 @@ export default function CartPage() {
 
                           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mt-4">
                             <div
-                              className={`flex items-center border border-gray-300 rounded-lg w-max ${
-                                isOutOfStock
-                                  ? "opacity-50 pointer-events-none"
-                                  : ""
-                              }`}
+                              className={`flex items-center border border-gray-300 rounded-lg w-max ${isOutOfStock
+                                ? "opacity-50 pointer-events-none"
+                                : ""
+                                }`}
                             >
                               <button
                                 onClick={() =>
@@ -468,11 +464,10 @@ export default function CartPage() {
                                   handleQuantityChange(item.orderDetailId, 1)
                                 }
                                 disabled={isMaxReached || isOutOfStock}
-                                className={`p-2 transition-colors rounded-r-lg ${
-                                  isMaxReached || isOutOfStock
-                                    ? "bg-gray-100 text-gray-300 cursor-not-allowed"
-                                    : "hover:bg-gray-100 text-gray-600"
-                                }`}
+                                className={`p-2 transition-colors rounded-r-lg ${isMaxReached || isOutOfStock
+                                  ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                                  : "hover:bg-gray-100 text-gray-600"
+                                  }`}
                               >
                                 <Plus size={16} />
                               </button>
@@ -483,11 +478,10 @@ export default function CartPage() {
                                 Thành tiền:
                               </span>
                               <span
-                                className={`text-lg font-bold ${
-                                  isOutOfStock
-                                    ? "text-gray-400 line-through"
-                                    : "text-red-600"
-                                }`}
+                                className={`text-lg font-bold ${isOutOfStock
+                                  ? "text-gray-400 line-through"
+                                  : "text-red-600"
+                                  }`}
                               >
                                 {(price * item.quantity).toLocaleString()}₫
                               </span>
@@ -526,10 +520,9 @@ export default function CartPage() {
                 onClick={handleCheckout}
                 disabled={selectedTotal === 0}
                 className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 group transition-all
-                  ${
-                    selectedTotal === 0
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
-                      : "bg-red-600 text-white shadow-red-200 hover:bg-red-700 hover:shadow-xl"
+                  ${selectedTotal === 0
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
+                    : "bg-red-600 text-white shadow-red-200 hover:bg-red-700 hover:shadow-xl"
                   }
                 `}
               >

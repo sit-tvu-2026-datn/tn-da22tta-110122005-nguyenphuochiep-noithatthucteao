@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import org.springframework.data.domain.Pageable;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,5 +53,30 @@ public interface OrderDetailRepository extends JpaRepository<OrderDetail, String
             "GROUP BY od.product.productId " +
             "ORDER BY SUM(od.quantity) DESC")
     List<String> findTopSellingProductIds(Pageable pageable);
+
+    /**
+     * Tổng số lượng đã bán theo sản phẩm trong khung thời gian gần đây (phục vụ Trending).
+     * Trả về danh sách [productId, sumQuantity].
+     */
+    @Query("SELECT od.product.productId, SUM(od.quantity) " +
+            "FROM OrderDetail od " +
+            "JOIN od.order o " +
+            "WHERE o.isOrder = true AND o.orderDate >= :since " +
+            "GROUP BY od.product.productId")
+    List<Object[]> sumPurchasesSince(@Param("since") LocalDateTime since);
+
+    /**
+     * Tìm các sản phẩm thường được mua chung với một sản phẩm (co-occurrence trong cùng đơn hàng).
+     * Phục vụ tính năng "Khách hàng cũng mua". Trả về [productId, frequency] sắp xếp giảm dần.
+     */
+    @Query("SELECT od2.product.productId, COUNT(od2) " +
+            "FROM OrderDetail od1, OrderDetail od2 " +
+            "WHERE od1.order = od2.order " +
+            "AND od1.product.productId = :productId " +
+            "AND od2.product.productId <> :productId " +
+            "AND od1.order.isOrder = true " +
+            "GROUP BY od2.product.productId " +
+            "ORDER BY COUNT(od2) DESC")
+    List<Object[]> findAlsoBoughtProductIds(@Param("productId") String productId, Pageable pageable);
 }
 
