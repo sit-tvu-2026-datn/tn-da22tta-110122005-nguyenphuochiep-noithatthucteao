@@ -30,7 +30,7 @@ export default function BrandBar() {
   return (
     <section
       id="brand-bar"
-      className="w-screen font-montserrat bg-nero border-y border-champagne/15"
+      className="w-screen font-roboto bg-nero border-y border-champagne/15"
       style={{
         marginLeft: "calc(-50vw + 50%)",
         marginRight: "calc(-50vw + 50%)",

@@ -44,6 +44,16 @@ public class AuthService {
         return null; // Sai email hoặc mật khẩu
     }
 
+    // Tìm user theo email (dùng để phân biệt lỗi đăng nhập)
+    public Optional<User> findByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+
+    // Kiểm tra mật khẩu khớp với user
+    public boolean checkPassword(String rawPassword, User user) {
+        return encoder.matches(rawPassword, user.getPassword());
+    }
+
     public String logout(String token) {
         // Có thể bổ sung cơ chế blacklist JWT nếu cần
         return "Logout successful";

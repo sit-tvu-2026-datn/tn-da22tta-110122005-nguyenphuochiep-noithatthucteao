@@ -6,7 +6,10 @@ export default {
   ],
   theme: {
     extend: {
-      fontFamily: { montserrat: ["Montserrat", "sans-serif"] },
+      fontFamily: {
+        montserrat: ["Montserrat", "sans-serif"],
+        roboto: ["Roboto", "sans-serif"],
+      },
       colors: {
         nero: "#0A0A0A",
         ivory: "#FAF9F6",

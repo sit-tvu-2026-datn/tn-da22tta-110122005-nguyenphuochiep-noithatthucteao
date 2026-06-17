@@ -103,7 +103,7 @@ export default function Header() {
 
   return (
     <header
-      className={`fixed top-0 w-full z-50 transition-all duration-500 ease-in-out font-montserrat ${
+      className={`fixed top-0 w-full z-50 transition-all duration-500 ease-in-out font-roboto ${
         isVisible ? "translate-y-0" : "-translate-y-full"
       } ${
         isScrolled

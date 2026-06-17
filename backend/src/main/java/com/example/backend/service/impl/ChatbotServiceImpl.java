@@ -120,6 +120,14 @@ public class ChatbotServiceImpl implements ChatbotService {
                     productContext + "\n" +
                     "--- KHO HÀNG KẾT THÚC ---\n\n" +
 
+                    "=== TRẢ LỜI CÂU HỎI VỀ THÔNG SỐ / CHI TIẾT SẢN PHẨM ===\n" +
+                    "Mỗi sản phẩm trong kho có trường 'Thông số' gồm: Kích thước (Dài x Rộng x Cao, đơn vị cm), Cân nặng, Màu sắc, Chất liệu, Bảo hành, Xuất xứ.\n" +
+                    "- Khi khách hỏi về thông số/chi tiết (vd: 'dài rộng cao bao nhiêu', 'kích thước thế nào', 'chất liệu gì', 'nặng bao nhiêu', 'bảo hành mấy năm', 'màu gì', 'xuất xứ ở đâu'): PHẢI trả lời TRỰC TIẾP và ĐÚNG TRỌNG TÂM đúng thông số được hỏi, lấy số liệu từ trường 'Thông số' của chính sản phẩm đó.\n" +
+                    "- Nếu khách hỏi 'dài rộng cao' thì nêu rõ từng chiều: Dài ... cm, Rộng ... cm, Cao ... cm. KHÔNG trả lời lan man sang giá hoặc sản phẩm khác trừ khi khách hỏi.\n" +
+                    "- Xác định đúng sản phẩm khách đang hỏi: dựa vào tên sản phẩm trong câu hỏi, hoặc sản phẩm vừa được nhắc tới gần nhất trong lịch sử trò chuyện.\n" +
+                    "- TUYỆT ĐỐI KHÔNG bịa thông số. Nếu trường 'Thông số' ghi 'Chưa cập nhật' hoặc thiếu đúng chỉ số khách hỏi: trả lời trung thực rằng shop chưa cập nhật thông số đó và mời khách để lại liên hệ để được hỗ trợ, KHÔNG tự nghĩ ra con số.\n" +
+                    "- Với câu hỏi thuần về thông số, trả lời ngắn gọn đúng trọng tâm; có thể kèm thẻ sản phẩm nhưng KHÔNG bắt buộc trình bày theo mẫu danh sách đề xuất.\n\n" +
+
                     "=== PHÂN TÍCH YÊU CẦU KHÁCH HÀNG ===\n" +
                     "Trước khi trả lời, hãy xác định:\n" +
                     "1. Loại phòng.\n" +
@@ -181,7 +189,8 @@ public class ChatbotServiceImpl implements ChatbotService {
 
                     "=== QUY TẮC NGÂN SÁCH ===\n" +
                     "Nếu khách cung cấp ngân sách:\n" +
-                    "- Tổng giá các sản phẩm đề xuất phải nhỏ hơn hoặc bằng ngân sách.\n" +
+                    "- Với các sản phẩm THAY THẾ nhau (cùng danh mục): GIÁ CỦA TỪNG sản phẩm phải nhỏ hơn hoặc bằng ngân sách. TUYỆT ĐỐI KHÔNG cộng dồn giá các sản phẩm thay thế rồi đem so với ngân sách.\n" +
+                    "- Chỉ khi khách yêu cầu COMBO/trọn bộ gồm nhiều món KHÁC danh mục: khi đó TỔNG giá các món trong combo mới phải nhỏ hơn hoặc bằng ngân sách.\n" +
                     "- Ưu tiên sản phẩm có tỷ lệ giá/chất lượng tốt.\n" +
                     "- Nếu ngân sách thấp, ưu tiên các món nội thất quan trọng trước.\n" +
                     "- Không được đề xuất sản phẩm vượt quá ngân sách nếu còn lựa chọn phù hợp khác.\n\n" +
@@ -211,30 +220,45 @@ public class ChatbotServiceImpl implements ChatbotService {
                     "- Thân thiện, lịch sự.\n" +
                     "- Nếu khách phàn nàn hoặc không hài lòng, phải xin lỗi trước.\n\n" +
 
+                    "=== PHÂN BIỆT SẢN PHẨM THAY THẾ & BỔ SUNG (RẤT QUAN TRỌNG) ===\n" +
+                    "Mỗi sản phẩm trong kho đều có trường 'Danh mục'. BẮT BUỘC dựa vào danh mục để phân loại:\n" +
+                    "- SẢN PHẨM THAY THẾ (alternative): các sản phẩm CÙNG một danh mục chính (vd: nhiều mẫu Sofa, nhiều mẫu Giường, nhiều Tivi, nhiều Tủ lạnh). Đây là các LỰA CHỌN khác nhau cho CÙNG một nhu cầu — khách thường chỉ mua MỘT trong số đó.\n" +
+                    "- SẢN PHẨM BỔ SUNG (complementary): các sản phẩm thuộc các danh mục KHÁC NHAU nhưng dùng chung trong một không gian (vd: Sofa + Bàn trà + Đèn + Thảm). Đây là các món có thể mua KÈM nhau.\n\n" +
+
+                    "NGUYÊN TẮC BẮT BUỘC:\n" +
+                    "- TUYỆT ĐỐI KHÔNG cộng giá của các sản phẩm THAY THẾ (cùng danh mục) với nhau.\n" +
+                    "- TUYỆT ĐỐI KHÔNG tạo 'Tổng chi phí dự kiến' từ các sản phẩm thay thế.\n" +
+                    "- KHÔNG dùng từ ngữ khiến khách hiểu rằng nên mua tất cả các sản phẩm thay thế cùng lúc.\n" +
+                    "- Khi có nhiều sản phẩm cùng phù hợp: chọn 1 sản phẩm TỐT NHẤT làm khuyến nghị chính, các sản phẩm còn lại là 'lựa chọn thay thế', và nêu ngắn gọn ưu/nhược của từng lựa chọn.\n\n" +
+
                     "=== ĐỊNH DẠNG KẾT QUẢ ===\n" +
-                    "Nếu tìm được sản phẩm:\n\n" +
+                    "Trước khi viết, hãy ĐẾM số danh mục khác nhau trong những sản phẩm em chọn để hiển thị, rồi chọn 1 trong 2 mẫu sau:\n\n" +
 
-                    "Dạ với nhu cầu của anh/chị, em xin đề xuất:\n\n" +
+                    "--- MẪU A: các sản phẩm CÙNG một danh mục (lựa chọn thay thế) ---\n" +
+                    "Mở đầu: 'Dạ với nhu cầu của anh/chị, em xin gợi ý các lựa chọn phù hợp:'\n" +
+                    "Liệt kê từng sản phẩm (KHÔNG trình bày như một bộ phải mua chung), chỉ rõ đâu là lựa chọn em đề xuất nhất:\n" +
+                    "[Tên Sản Phẩm](Link) ![GiáGốc|GiáGiảm](LinkẢnh)\n" +
+                    "Ưu điểm: ... | Phù hợp với: ...\n" +
+                    "[Tên Sản Phẩm](Link) ![GiáGốc|GiáGiảm](LinkẢnh)\n" +
+                    "Ưu điểm: ... | Phù hợp với: ...\n" +
+                    "Kết thúc bằng dòng: 'Các lựa chọn phù hợp cho anh/chị tham khảo ạ.'\n" +
+                    "=> Ở MẪU A: TUYỆT ĐỐI KHÔNG ghi 'Tổng chi phí dự kiến' và KHÔNG cộng giá.\n\n" +
 
-                    "1. [Tên Sản Phẩm](Link) ![GiáGốc|GiáGiảm](LinkẢnh)\n" +
-                    "2. [Tên Sản Phẩm](Link) ![GiáGốc|GiáGiảm](LinkẢnh)\n" +
-                    "3. [Tên Sản Phẩm](Link) ![GiáGốc|GiáGiảm](LinkẢnh)\n\n" +
+                    "--- MẪU B: các sản phẩm thuộc NHIỀU danh mục bổ sung nhau (combo/trọn bộ) HOẶC khách yêu cầu combo ---\n" +
+                    "Mở đầu: 'Dạ em xin đề xuất bộ sản phẩm cho không gian của anh/chị:'\n" +
+                    "[Tên Sản Phẩm](Link) ![GiáGốc|GiáGiảm](LinkẢnh)\n" +
+                    "[Tên Sản Phẩm](Link) ![GiáGốc|GiáGiảm](LinkẢnh)\n" +
+                    "Khi đó MỚI được ghi: 'Tổng chi phí dự kiến: XXX VNĐ' (chỉ cộng giá các món KHÁC danh mục trong combo).\n\n" +
 
-                    "Tổng chi phí dự kiến: XXX VNĐ\n\n" +
-
-                    "Lý do lựa chọn:\n" +
-                    "- Phù hợp diện tích.\n" +
-                    "- Phù hợp ngân sách.\n" +
-                    "- Phù hợp nhu cầu khách hàng.\n\n" +
+                    "Sau cùng, nêu 'Lý do lựa chọn' ngắn gọn (phù hợp diện tích / ngân sách / nhu cầu).\n\n" +
 
                     "=== QUY TẮC HIỂN THỊ ===\n" +
                     "- Chỉ hiển thị tối đa 3 sản phẩm.\n" +
-                    "- Chỉ hiển thị sản phẩm đã lọc.\n" +
+                    "- Chỉ hiển thị sản phẩm đã lọc, có trong kho.\n" +
                     "- Không viết mô tả dài cho từng sản phẩm.\n" +
-                    "- Giá trong ![] chỉ được là số nguyên.\n" +
-                    "- Không thêm ký tự tiền tệ vào trong ![].\n" +
-                    "- Không hiển thị sản phẩm không có trong kho.\n" +
-                    "- Luôn tính tổng giá dự kiến nếu có đủ dữ liệu.\n";
+                    "- Giá trong ![] chỉ được là số nguyên, không thêm ký tự tiền tệ.\n" +
+                    "- CHỈ hiển thị 'Tổng chi phí dự kiến' khi áp dụng MẪU B (nhiều món KHÁC danh mục/combo, hoặc khách yêu cầu combo).\n" +
+                    "- Nếu tất cả sản phẩm hiển thị thuộc CÙNG một danh mục: KHÔNG tính tổng, KHÔNG dùng cụm từ 'Tổng chi phí dự kiến', thay bằng 'Các lựa chọn phù hợp'.\n";
                     
             // Add System Prompt
             messages.add(Map.of("role", "system", "content", promptContent));
@@ -278,6 +302,16 @@ public class ChatbotServiceImpl implements ChatbotService {
         String searchText = buildSearchText(userMessage, history);
         List<Product> relevant = filterRelevantProducts(searchText, products);
 
+        // Map categoryId -> tên danh mục (gốc) để gắn vào context. Nhờ đó AI phân biệt được
+        // sản phẩm THAY THẾ (cùng danh mục) với sản phẩm BỔ SUNG (khác danh mục) và không
+        // cộng nhầm giá các lựa chọn thay thế thành một "tổng chi phí".
+        Map<String, String> categoryDisplayNames = new HashMap<>();
+        for (Category c : categoryRepository.findAll()) {
+            if (c.getCategoryId() != null) {
+                categoryDisplayNames.put(c.getCategoryId(), safe(c.getCategoryName()));
+            }
+        }
+
         // !!! QUAN TRỌNG: Thay đổi domain này thành domain thật của server chứa ảnh
         String IMAGE_BASE_URL = "http://localhost:8080";
 
@@ -319,13 +353,19 @@ public class ChatbotServiceImpl implements ChatbotService {
                     int quantity = p.getQuantity();
                     String status = (quantity > 0) ? "CÒN HÀNG" : "HẾT HÀNG";
 
+                    String categoryName = p.getCategoryId() != null
+                            ? categoryDisplayNames.getOrDefault(p.getCategoryId(), "Khác")
+                            : "Khác";
+
                     // Data gửi cho AI
                     return String.format(
-                            "- Tên: %s | Trạng thái: %s | Giá Gốc: %s | Giá Giảm: %s | Link: %s | Ảnh: %s | Mô tả: %s",
+                            "- Tên: %s | Danh mục: %s | Trạng thái: %s | Giá Gốc: %s | Giá Giảm: %s | Thông số: %s | Link: %s | Ảnh: %s | Mô tả: %s",
                             p.getProductName(),
+                            categoryName,
                             status,
                             originalPriceTxt,
                             priceTxt,
+                            buildProductSpecs(p),
                             productLink,
                             finalImgUrl,
                             truncate(p.getDescription(), 150));
@@ -518,6 +558,54 @@ public class ChatbotServiceImpl implements ChatbotService {
             return "";
         s = s.replaceAll("\\s+", " ").trim();
         return s.length() <= max ? s : s.substring(0, max) + "...";
+    }
+
+    /**
+     * Gom các thông số kỹ thuật của sản phẩm thành một chuỗi ngắn gọn để đưa vào context,
+     * giúp chatbot trả lời được câu hỏi về chi tiết sản phẩm (dài/rộng/cao, chất liệu, màu...).
+     * Chỉ thêm trường có dữ liệu. Đơn vị tuân theo quy ước hiển thị ở frontend:
+     * kích thước Dài x Rộng x Cao tính bằng cm; cân nặng lưu bằng gram (>= 1000 đổi sang kg).
+     */
+    private String buildProductSpecs(Product p) {
+        List<String> parts = new ArrayList<>();
+
+        // Kích thước: ưu tiên Dài x Rộng x Cao (cm); nếu thiếu thì dùng trường size dạng text
+        if (p.getLength() != null && p.getWidth() != null && p.getHeight() != null) {
+            parts.add(String.format("Kích thước (Dài x Rộng x Cao): %d x %d x %d cm",
+                    p.getLength(), p.getWidth(), p.getHeight()));
+        } else {
+            if (p.getLength() != null)
+                parts.add("Chiều dài: " + p.getLength() + " cm");
+            if (p.getWidth() != null)
+                parts.add("Chiều rộng: " + p.getWidth() + " cm");
+            if (p.getHeight() != null)
+                parts.add("Chiều cao: " + p.getHeight() + " cm");
+            if (p.getLength() == null && p.getWidth() == null && p.getHeight() == null
+                    && p.getSize() != null && !p.getSize().isBlank())
+                parts.add("Kích thước: " + p.getSize().trim());
+        }
+
+        // Cân nặng: DB lưu bằng gram
+        if (p.getWeight() != null && p.getWeight() > 0) {
+            if (p.getWeight() >= 1000) {
+                double kg = p.getWeight() / 1000.0;
+                String kgStr = (kg == Math.floor(kg)) ? String.valueOf((long) kg) : String.format("%.1f", kg);
+                parts.add("Cân nặng: " + kgStr + " kg");
+            } else {
+                parts.add("Cân nặng: " + p.getWeight() + " g");
+            }
+        }
+
+        if (p.getColor() != null && !p.getColor().isBlank())
+            parts.add("Màu sắc: " + p.getColor().trim());
+        if (p.getMaterial() != null && !p.getMaterial().isBlank())
+            parts.add("Chất liệu: " + p.getMaterial().trim());
+        if (p.getWarranty() != null && !p.getWarranty().isBlank())
+            parts.add("Bảo hành: " + p.getWarranty().trim());
+        if (p.getOrigin() != null && !p.getOrigin().isBlank())
+            parts.add("Xuất xứ: " + p.getOrigin().trim());
+
+        return parts.isEmpty() ? "Chưa cập nhật" : String.join("; ", parts);
     }
 
     private String safe(String s) {

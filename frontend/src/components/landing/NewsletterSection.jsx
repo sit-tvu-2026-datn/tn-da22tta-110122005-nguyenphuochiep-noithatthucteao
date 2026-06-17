@@ -21,7 +21,7 @@ export default function NewsletterSection() {
   return (
     <section
       id="newsletter-section"
-      className="relative font-montserrat py-24 sm:py-32 overflow-hidden bg-nero"
+      className="relative font-roboto py-24 sm:py-32 overflow-hidden bg-nero"
       style={{
         marginLeft: "calc(-50vw + 50%)",
         marginRight: "calc(-50vw + 50%)",

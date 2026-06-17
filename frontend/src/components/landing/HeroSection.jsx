@@ -12,7 +12,7 @@ export default function HeroSection() {
   return (
     <section
       id="hero-section"
-      className="relative w-screen min-h-[100svh] flex items-center justify-center overflow-hidden font-montserrat -mx-4 sm:-mx-6 lg:-mx-8"
+      className="relative w-screen min-h-[100svh] flex items-center justify-center overflow-hidden font-roboto -mx-4 sm:-mx-6 lg:-mx-8"
       style={{ marginLeft: "calc(-50vw + 50%)", marginRight: "calc(-50vw + 50%)", width: "100vw" }}
     >
       {/* Background Image with Ken Burns */}
@@ -58,7 +58,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.4, ease: LUXURY_EASE }}
-          className="text-white font-extrabold uppercase leading-[0.9] tracking-tight mb-6"
+          className="text-white font-extrabold uppercase leading-[1.1] tracking-tight mb-6"
           style={{ fontSize: "clamp(2.5rem, 8vw, 7rem)" }}
         >
           Định Hình

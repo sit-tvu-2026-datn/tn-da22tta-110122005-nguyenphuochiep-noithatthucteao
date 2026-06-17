@@ -1,117 +1,33 @@
 import { useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { message } from "antd";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Camera,
+  ChevronDown,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import api from "../../config/api";
 
-// --- ICONS (SVG) ---
-const UserIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-5 w-5"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-    />
-  </svg>
-);
-const MailIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-5 w-5"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-    />
-  </svg>
-);
-const LockIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-5 w-5"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-    />
-  </svg>
-);
-const CameraIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-6 w-6"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-    />
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-    />
-  </svg>
-);
-const PhoneIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-5 w-5"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-    />
-  </svg>
-);
-const LocationIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-5 w-5"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-    />
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-    />
-  </svg>
-);
+const LUXURY_EASE = [0.22, 1, 0.36, 1];
+
+const DEFAULT_AVATAR =
+  "https://res.cloudinary.com/ddnzj70uw/image/upload/v1759990027/avt-default_r2kgze.png";
+
+// Style helpers — hairline input shared with the login page
+const labelCls =
+  "font-roboto text-[11px] font-semibold uppercase tracking-[0.2em] text-smoke";
+const inputCls = (error) =>
+  `peer w-full border-0 border-b bg-transparent pb-2.5 text-[15px] text-nero placeholder-smoke/40 transition-colors focus:outline-none disabled:opacity-50 ${error
+    ? "border-red-400 focus:border-red-500"
+    : "border-whisper focus:border-champagne"
+  }`;
+const underlineCls = (error) =>
+  `pointer-events-none absolute bottom-0 left-0 h-px w-full origin-left scale-x-0 transition-transform duration-500 ease-out peer-focus:scale-x-100 ${error ? "bg-red-500" : "bg-champagne"
+  }`;
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -126,18 +42,67 @@ export default function Register() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState(
-    "https://res.cloudinary.com/ddnzj70uw/image/upload/v1759990027/avt-default_r2kgze.png"
-  );
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRePassword, setShowRePassword] = useState(false);
+  const [errors, setErrors] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    password: "",
+    rePassword: "",
+    form: "",
+  });
+  const [preview, setPreview] = useState(DEFAULT_AVATAR);
   const [messageApi, contextHolder] = message.useMessage();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const reduceMotion = useReducedMotion();
+
+  // ✅ Kiểm tra hợp lệ phía client
+  const emailValue = formData.email.trim();
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
+  const phoneValue = formData.phone.trim();
+  const phoneValid = phoneValue === "" || /^0\d{9}$/.test(phoneValue);
+  const isFormValid =
+    formData.fullName.trim() !== "" &&
+    emailValue !== "" &&
+    emailValid &&
+    formData.password.length >= 6 &&
+    formData.rePassword !== "" &&
+    formData.password === formData.rePassword &&
+    phoneValid;
+
+  const validate = () => {
+    const next = {
+      fullName: "",
+      email: "",
+      phone: "",
+      password: "",
+      rePassword: "",
+      form: "",
+    };
+    if (!formData.fullName.trim()) next.fullName = "Vui lòng nhập họ và tên";
+    if (!emailValue) next.email = "Vui lòng nhập email";
+    else if (!emailValid) next.email = "Email không hợp lệ";
+    if (!phoneValid) next.phone = "Số điện thoại không hợp lệ";
+    if (!formData.password) next.password = "Vui lòng nhập mật khẩu";
+    else if (formData.password.length < 6)
+      next.password = "Mật khẩu phải có ít nhất 6 ký tự";
+    if (!formData.rePassword) next.rePassword = "Vui lòng nhập lại mật khẩu";
+    else if (formData.password !== formData.rePassword)
+      next.rePassword = "Mật khẩu nhập lại không khớp";
+    return next;
+  };
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    setFormData((p) => ({ ...p, [name]: value }));
+    setErrors((p) => ({
+      ...p,
+      [name]: "",
+      ...(name === "password" ? { rePassword: "" } : {}),
+      form: "",
+    }));
   };
 
   const handleAvatarChange = (e) => {
@@ -154,17 +119,29 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
 
-    if (formData.password !== formData.rePassword) {
-      messageApi.error("Mật khẩu nhập lại không khớp!");
-      setLoading(false);
+    // ❶ Kiểm tra phía client — chặn gửi khi rỗng / sai định dạng
+    const clientErrors = validate();
+    const hasError = Object.entries(clientErrors).some(
+      ([k, v]) => k !== "form" && v
+    );
+    if (hasError) {
+      setErrors(clientErrors);
       return;
     }
 
+    setErrors({
+      fullName: "",
+      email: "",
+      phone: "",
+      password: "",
+      rePassword: "",
+      form: "",
+    });
+    setLoading(true);
+
     try {
-      let avatarUrl =
-        "https://res.cloudinary.com/ddnzj70uw/image/upload/v1759990027/avt-default_r2kgze.png";
+      let avatarUrl = DEFAULT_AVATAR;
 
       if (formData.avatar) {
         const data = new FormData();
@@ -185,7 +162,7 @@ export default function Register() {
 
       const payload = {
         fullName: formData.fullName,
-        email: formData.email,
+        email: emailValue,
         password: formData.password,
         phone_number: formData.phone,
         address: formData.address,
@@ -200,315 +177,453 @@ export default function Register() {
         setTimeout(() => {
           navigate("/login", {
             state: {
-              email: formData.email,
+              email: emailValue,
               password: formData.password,
             },
           });
         }, 1500);
       } else if (data.error) {
         if (data.error.includes("exists")) {
+          setErrors((p) => ({ ...p, email: "Email đã được sử dụng" }));
           messageApi.error("Email đã được sử dụng, vui lòng chọn email khác!");
         } else {
           messageApi.error("Đăng ký thất bại: " + data.error);
         }
+        setLoading(false);
       } else {
         messageApi.error("Có lỗi xảy ra, vui lòng thử lại!");
+        setLoading(false);
       }
     } catch (error) {
-      console.error("Lỗi khi đăng ký:", error);
-      if (error.response?.data?.error?.includes("exists")) {
+      // ❷ Phân loại lỗi từ máy chủ
+      const serverErr = error.response?.data?.error;
+      if (serverErr?.includes("exists")) {
+        setErrors((p) => ({ ...p, email: "Email đã được sử dụng" }));
         messageApi.error("Email đã được sử dụng, vui lòng chọn email khác!");
+      } else if (!error.response) {
+        messageApi.error("Không thể kết nối đến máy chủ. Vui lòng thử lại.");
       } else {
-        messageApi.error("Không thể kết nối đến máy chủ!");
+        messageApi.error(serverErr || "Đăng ký thất bại. Vui lòng thử lại.");
       }
-    } finally {
       setLoading(false);
     }
   };
 
+  const fade = reduceMotion
+    ? {}
+    : { initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 } };
+
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-white">
+    <div className="min-h-screen flex bg-ivory font-roboto text-nero">
       {contextHolder}
 
-      {/* LEFT SIDE: Image / Branding */}
-      {/* - lg:sticky lg:top-0 lg:h-screen: Giữ ảnh cố định khi cuộn trên Desktop
-          - hidden lg:flex: Ẩn trên Mobile để tập trung vào Form
-      */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gray-900 relative justify-center items-center overflow-hidden lg:sticky lg:top-0 lg:h-screen">
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-60"
-          style={{
-            backgroundImage:
-              "url('https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=2000&auto=format&fit=crop')",
-          }}
-        ></div>
-        <div className="relative z-10 text-center px-10">
-          <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
-            NPH STORE
-          </h1>
-          <p className="text-gray-200 text-lg font-light">
-            Kiến tạo không gian sống đẳng cấp và tiện nghi cho ngôi nhà của bạn.
+      {/* ─────────────────────────────────────────────
+          LEFT · EDITORIAL PANEL (lg+, sticky)
+          ───────────────────────────────────────────── */}
+      <aside className="relative hidden lg:flex lg:w-[45%] overflow-hidden bg-nero lg:sticky lg:top-0 lg:h-screen">
+        <div className="absolute inset-0">
+          <div
+            className="absolute inset-0 bg-cover bg-center motion-safe:animate-ken-burns"
+            style={{
+              backgroundImage:
+                "url('https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=2400&auto=format&fit=crop')",
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-nero via-nero/55 to-nero/30" />
+          <div className="absolute inset-0 bg-gradient-to-r from-nero/40 via-transparent to-transparent" />
+        </div>
+
+        {/* Corner brackets — brand motif */}
+        <span className="pointer-events-none absolute top-10 left-10 h-12 w-12 border-t border-l border-champagne/40" />
+        <span className="pointer-events-none absolute bottom-10 right-10 h-12 w-12 border-b border-r border-champagne/40" />
+
+        {/* Brand mark */}
+        <Link
+          to="/"
+          className="absolute top-10 left-12 z-10 font-roboto text-4xl font-extrabold uppercase tracking-tight text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/60 focus-visible:ring-offset-4 focus-visible:ring-offset-nero"
+        >
+          NPH <span className="text-champagne">Store</span>
+        </Link>
+
+        {/* Editorial copy */}
+        <div className="relative z-10 mt-auto p-12 xl:p-16 max-w-xl">
+          <div className="mb-6 flex items-center gap-3">
+            <span className="inline-block h-px w-8 bg-champagne" />
+            <span className="font-roboto text-[11px] font-semibold uppercase tracking-[0.3em] text-champagne">
+              Thành viên mới
+            </span>
+          </div>
+          <p
+            className="font-roboto font-extrabold uppercase leading-[1.1] tracking-tight text-white"
+            style={{ fontSize: "clamp(1.75rem, 3vw, 2.75rem)" }}
+          >
+            Gia nhập cộng đồng
+            <br />
+            những người yêu
+            <br />
+            <span className="text-champagne">không gian đẹp</span>
+          </p>
+          <p className="mt-6 text-sm font-light tracking-wide text-white/55">
+            Ưu đãi riêng · Theo dõi đơn hàng · Lưu thiết kế của bạn
           </p>
         </div>
-      </div>
+      </aside>
 
-      {/* RIGHT SIDE: Form */}
-      {/* - pt-24: Padding top lớn (khoảng 96px) để tránh bị Header che trên Mobile
-          - lg:pt-12: Padding top nhỏ hơn trên Desktop vì layout 2 cột thoáng hơn
-          - min-h-screen: Đảm bảo bao phủ toàn bộ chiều cao nhưng cho phép cuộn tự nhiên
-      */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 min-h-screen pt-24 lg:pt-12">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900">
-              Tạo tài khoản mới
-            </h2>
-            <p className="text-gray-500 mt-2 text-sm">
-              Nhập thông tin chi tiết để bắt đầu
+      {/* ─────────────────────────────────────────────
+          RIGHT · FORM
+          ───────────────────────────────────────────── */}
+      <main className="relative flex w-full flex-col px-6 py-8 sm:px-10 lg:w-[55%] lg:px-16">
+        {/* Top bar: mobile brand + back link */}
+        <div className="flex items-center justify-between">
+          <Link
+            to="/"
+            className="font-roboto text-lg font-extrabold uppercase tracking-tight text-nero lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory"
+          >
+            NPH <span className="text-champagne">Store</span>
+          </Link>
+          <Link
+            to="/"
+            className="group ml-auto inline-flex items-center gap-2 text-sm text-smoke transition-colors hover:text-nero focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory"
+          >
+            <ArrowLeft
+              size={16}
+              className="transition-transform duration-300 group-hover:-translate-x-0.5"
+            />
+            Trang chủ
+          </Link>
+        </div>
+
+        {/* Form block */}
+        <motion.div
+          {...fade}
+          transition={{ duration: 0.7, ease: LUXURY_EASE }}
+          className="mx-auto w-full max-w-[480px] py-10"
+        >
+          {/* Heading */}
+          <div className="mb-9">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="inline-block h-px w-8 bg-champagne" />
+              <span className="font-roboto text-[11px] font-semibold uppercase tracking-[0.3em] text-champagne">
+                Đăng ký
+              </span>
+            </div>
+            <h1
+              className="font-roboto font-extrabold uppercase leading-[1.05] tracking-tight text-nero"
+              style={{ fontSize: "clamp(2rem, 4vw, 2.75rem)" }}
+            >
+              Tạo tài khoản
+            </h1>
+            <p className="mt-4 text-[15px] leading-relaxed text-smoke">
+              Nhập thông tin của bạn để bắt đầu hành trình kiến tạo không gian.
             </p>
           </div>
 
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            {/* Avatar Upload */}
-            <div className="flex justify-center mb-6">
-              <div className="relative group">
-                <div
-                  onClick={handleAvatarClick}
-                  className="w-28 h-28 rounded-full border-4 border-gray-100 shadow-lg overflow-hidden cursor-pointer relative"
-                >
-                  <img
-                    src={preview}
-                    alt="Avatar Preview"
-                    className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-all">
-                    <CameraIcon />
-                    <span className="text-white text-xs font-medium ml-1">
-                      Đổi ảnh
-                    </span>
-                  </div>
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                  ref={fileInputRef}
-                  className="hidden"
+          <form className="space-y-7" onSubmit={handleSubmit} noValidate>
+            {/* Avatar */}
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={handleAvatarClick}
+                className="group relative h-24 w-24 overflow-hidden rounded-full ring-1 ring-whisper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne"
+                aria-label="Chọn ảnh đại diện"
+              >
+                <img
+                  src={preview}
+                  alt="Ảnh đại diện"
+                  className="h-full w-full object-cover transition-opacity group-hover:opacity-70"
                 />
-              </div>
+                <span className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-nero/40 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Camera size={20} className="text-white" />
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-white">
+                    Đổi ảnh
+                  </span>
+                </span>
+              </button>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                ref={fileInputRef}
+                className="hidden"
+              />
             </div>
 
-            {/* Full Name */}
+            {/* Full name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="fullName" className={`mb-2.5 block ${labelCls}`}>
                 Họ và tên
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                  <UserIcon />
-                </div>
                 <input
-                  type="text"
+                  id="fullName"
                   name="fullName"
+                  type="text"
+                  required
+                  disabled={loading}
                   value={formData.fullName}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-black focus:border-black block transition-colors"
+                  aria-invalid={!!errors.fullName}
+                  aria-describedby={
+                    errors.fullName ? "fullName-error" : undefined
+                  }
                   placeholder="Nguyễn Văn A"
-                  required
+                  className={inputCls(errors.fullName)}
                 />
+                <span className={underlineCls(errors.fullName)} />
               </div>
+              {errors.fullName && (
+                <p
+                  id="fullName-error"
+                  role="alert"
+                  className="mt-2 text-xs text-red-600"
+                >
+                  {errors.fullName}
+                </p>
+              )}
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Địa chỉ Email
+              <label htmlFor="email" className={`mb-2.5 block ${labelCls}`}>
+                Email
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                  <MailIcon />
-                </div>
                 <input
-                  type="email"
+                  id="email"
                   name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  disabled={loading}
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-black focus:border-black block transition-colors"
-                  placeholder="name@company.com"
-                  required
+                  aria-invalid={!!errors.email}
+                  aria-describedby={errors.email ? "email-error" : undefined}
+                  placeholder="name@example.com"
+                  className={inputCls(errors.email)}
                 />
+                <span className={underlineCls(errors.email)} />
               </div>
+              {errors.email && (
+                <p
+                  id="email-error"
+                  role="alert"
+                  className="mt-2 text-xs text-red-600"
+                >
+                  {errors.email}
+                </p>
+              )}
             </div>
 
-            {/* Group: Phone & Gender */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Phone */}
+            {/* Phone + Gender */}
+            <div className="grid grid-cols-1 gap-x-6 gap-y-7 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="phone" className={`mb-2.5 block ${labelCls}`}>
                   Số điện thoại
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    <PhoneIcon />
-                  </div>
                   <input
-                    type="tel"
+                    id="phone"
                     name="phone"
+                    type="tel"
+                    disabled={loading}
                     value={formData.phone}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-black focus:border-black block transition-colors"
-                    placeholder="0912..."
+                    aria-invalid={!!errors.phone}
+                    aria-describedby={errors.phone ? "phone-error" : undefined}
+                    placeholder="09xxxxxxxx"
+                    className={inputCls(errors.phone)}
                   />
+                  <span className={underlineCls(errors.phone)} />
                 </div>
+                {errors.phone && (
+                  <p
+                    id="phone-error"
+                    role="alert"
+                    className="mt-2 text-xs text-red-600"
+                  >
+                    {errors.phone}
+                  </p>
+                )}
               </div>
 
-              {/* Gender */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="gender" className={`mb-2.5 block ${labelCls}`}>
                   Giới tính
                 </label>
                 <div className="relative">
                   <select
+                    id="gender"
                     name="gender"
+                    disabled={loading}
                     value={formData.gender}
                     onChange={handleChange}
-                    className="w-full pl-3 pr-4 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-black focus:border-black block transition-colors appearance-none"
+                    className="peer w-full appearance-none border-0 border-b border-whisper bg-transparent pb-2.5 pr-6 text-[15px] text-nero transition-colors focus:border-champagne focus:outline-none disabled:opacity-50"
                   >
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
                   </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                    <svg
-                      className="w-4 h-4 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 9l-7 7-7-7"
-                      ></path>
-                    </svg>
-                  </div>
+                  <span className={underlineCls(false)} />
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute bottom-2.5 right-0 text-smoke"
+                  />
                 </div>
               </div>
             </div>
 
             {/* Address */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="address" className={`mb-2.5 block ${labelCls}`}>
                 Địa chỉ
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                  <LocationIcon />
-                </div>
                 <input
-                  type="text"
+                  id="address"
                   name="address"
+                  type="text"
+                  disabled={loading}
                   value={formData.address}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-black focus:border-black block transition-colors"
-                  placeholder="Số 123, Đường ABC..."
+                  placeholder="Số 123, Đường ABC…"
+                  className={inputCls(false)}
                 />
+                <span className={underlineCls(false)} />
               </div>
             </div>
 
-            {/* Group: Passwords */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Password */}
+            {/* Password + Re-password */}
+            <div className="grid grid-cols-1 gap-x-6 gap-y-7 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="password"
+                  className={`mb-2.5 block ${labelCls}`}
+                >
                   Mật khẩu
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    <LockIcon />
-                  </div>
                   <input
-                    type="password"
+                    id="password"
                     name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    disabled={loading}
                     value={formData.password}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-black focus:border-black block transition-colors"
+                    aria-invalid={!!errors.password}
+                    aria-describedby={
+                      errors.password ? "password-error" : undefined
+                    }
                     placeholder="••••••••"
-                    required
+                    className={`${inputCls(errors.password)} pr-10`}
                   />
+                  <span className={underlineCls(errors.password)} />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    aria-pressed={showPassword}
+                    className="absolute bottom-2 right-0 text-smoke transition-colors hover:text-nero focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
+                {errors.password && (
+                  <p
+                    id="password-error"
+                    role="alert"
+                    className="mt-2 text-xs text-red-600"
+                  >
+                    {errors.password}
+                  </p>
+                )}
               </div>
 
-              {/* Re-Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="rePassword"
+                  className={`mb-2.5 block ${labelCls}`}
+                >
                   Nhập lại mật khẩu
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    <LockIcon />
-                  </div>
                   <input
-                    type="password"
+                    id="rePassword"
                     name="rePassword"
+                    type={showRePassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    disabled={loading}
                     value={formData.rePassword}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-black focus:border-black block transition-colors"
+                    aria-invalid={!!errors.rePassword}
+                    aria-describedby={
+                      errors.rePassword ? "rePassword-error" : undefined
+                    }
                     placeholder="••••••••"
-                    required
+                    className={`${inputCls(errors.rePassword)} pr-10`}
                   />
+                  <span className={underlineCls(errors.rePassword)} />
+                  <button
+                    type="button"
+                    onClick={() => setShowRePassword((v) => !v)}
+                    aria-label={
+                      showRePassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
+                    }
+                    aria-pressed={showRePassword}
+                    className="absolute bottom-2 right-0 text-smoke transition-colors hover:text-nero focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50"
+                  >
+                    {showRePassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
+                {errors.rePassword && (
+                  <p
+                    id="rePassword-error"
+                    role="alert"
+                    className="mt-2 text-xs text-red-600"
+                  >
+                    {errors.rePassword}
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Submit */}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-70 transition-all mt-6"
+              disabled={loading || !isFormValid}
+              className="group relative flex w-full items-center justify-center gap-2.5 bg-champagne py-4 font-roboto text-xs font-bold uppercase tracking-[0.18em] text-nero transition-all duration-500 hover:shadow-[0_0_40px_rgba(200,169,110,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nero focus-visible:ring-offset-2 focus-visible:ring-offset-ivory disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
             >
               {loading ? (
-                <span className="flex items-center">
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-nero/30 border-t-nero" />
                   Đang xử lý...
-                </span>
+                </>
               ) : (
-                "Đăng ký ngay"
+                <>
+                  Đăng ký
+                  <ArrowRight
+                    size={16}
+                    className="transition-transform duration-300 group-hover:translate-x-1"
+                  />
+                </>
               )}
             </button>
 
             {/* Footer */}
-            <p className="text-center text-sm text-gray-600 mt-4 pb-4">
+            <p className="pt-1 text-center text-sm text-smoke">
               Đã có tài khoản?{" "}
               <Link
                 to="/login"
-                className="font-semibold text-black hover:underline"
+                className="font-semibold text-nero underline-offset-4 transition-colors hover:text-champagne hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory"
               >
-                Đăng nhập tại đây
+                Đăng nhập
               </Link>
             </p>
           </form>
-        </div>
-      </div>
+        </motion.div>
+      </main>
     </div>
   );
 }

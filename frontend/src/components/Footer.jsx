@@ -5,7 +5,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="w-full bg-nero text-white/50 mt-auto font-montserrat">
+    <footer className="w-full bg-nero text-white/50 mt-auto font-roboto">
       {/* Top Gold Line */}
       <div className="h-px bg-gradient-to-r from-transparent via-champagne/40 to-transparent" />
 

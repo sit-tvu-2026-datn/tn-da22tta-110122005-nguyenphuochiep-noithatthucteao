@@ -8,7 +8,7 @@ export default function LifestyleSection() {
   return (
     <section
       id="lifestyle-section"
-      className="font-montserrat bg-ivory"
+      className="font-roboto bg-ivory"
       style={{
         marginLeft: "calc(-50vw + 50%)",
         marginRight: "calc(-50vw + 50%)",

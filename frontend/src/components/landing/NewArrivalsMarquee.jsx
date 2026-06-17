@@ -45,7 +45,7 @@ export default function NewArrivalsMarquee() {
   return (
     <section
       id="new-arrivals-marquee"
-      className="font-montserrat py-20 sm:py-28 bg-ivory overflow-hidden"
+      className="font-roboto py-20 sm:py-28 bg-ivory overflow-hidden"
       style={{
         marginLeft: "calc(-50vw + 50%)",
         marginRight: "calc(-50vw + 50%)",

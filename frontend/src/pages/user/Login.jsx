@@ -3,13 +3,17 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
 import { message, Spin } from "antd";
 import Cookies from "js-cookie";
-import { Eye, EyeOff, Mail, Lock, ArrowLeft, LogIn } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import api from "../../config/api";
+
+const LUXURY_EASE = [0.22, 1, 0.36, 1];
 
 export default function Login() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, login } = useContext(AuthContext);
+  const reduceMotion = useReducedMotion();
 
   // 🧠 Logic giữ nguyên
   const initialEmail =
@@ -24,7 +28,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false); // Trạng thái đang xử lý đăng nhập thành công
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({ email: "", password: "", form: "" });
   const [messageApi, contextHolder] = message.useMessage();
+
+  // ✅ Kiểm tra hợp lệ phía client
+  const emailValue = email.trim();
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
+  const isFormValid = emailValue !== "" && password !== "";
 
   // ✅ Cập nhật: Logic điều hướng tự động khi đã có user (F5 trang)
   useEffect(() => {
@@ -38,13 +48,34 @@ export default function Login() {
     }
   }, [user, navigate, isLoggingIn]);
 
+  // Xác thực các trường trước khi gửi
+  const validate = () => {
+    const next = { email: "", password: "", form: "" };
+    if (!emailValue) next.email = "Vui lòng nhập email";
+    else if (!emailValid) next.email = "Email không hợp lệ";
+    if (!password) next.password = "Vui lòng nhập mật khẩu";
+    return next;
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
+
+    // ❶ Kiểm tra phía client — chặn gửi khi rỗng / sai định dạng
+    const clientErrors = validate();
+    if (clientErrors.email || clientErrors.password) {
+      setErrors(clientErrors);
+      return;
+    }
+
+    setErrors({ email: "", password: "", form: "" });
     setLoading(true);
 
     try {
       // 1. Gọi API Login
-      const { data } = await api.post("/api/auth/login", { email, password });
+      const { data } = await api.post("/api/auth/login", {
+        email: emailValue,
+        password,
+      });
 
       const token = data.token;
       if (!token) throw new Error("Phản hồi không hợp lệ từ máy chủ");
@@ -69,7 +100,7 @@ export default function Login() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const userData = profileRes.data;
-      
+
       // Cập nhật Context
       await login(userData, token);
 
@@ -83,178 +114,303 @@ export default function Login() {
       }, 1000);
 
     } catch (err) {
-      messageApi.error(err.message || "Đăng nhập thất bại");
+      // ❷ Phân loại lỗi từ máy chủ để hiển thị thông báo rõ ràng
+      const code = err.response?.data?.code;
+      const serverMsg = err.response?.data?.error;
+      const next = { email: "", password: "", form: "" };
+
+      if (!err.response) {
+        // Mất kết nối / máy chủ không phản hồi
+        next.form = "Không thể kết nối đến máy chủ. Vui lòng thử lại.";
+      } else if (code === "ACCOUNT_NOT_FOUND") {
+        next.email = "Tài khoản chưa được đăng ký";
+      } else if (code === "WRONG_PASSWORD") {
+        next.password = "Mật khẩu không chính xác";
+      } else if (code === "GOOGLE_ACCOUNT") {
+        next.form = serverMsg;
+      } else if (code === "MISSING_FIELDS") {
+        next.form = serverMsg;
+      } else if (err.response.status === 401) {
+        next.form = "Email hoặc mật khẩu không chính xác";
+      } else {
+        next.form = serverMsg || "Đăng nhập thất bại. Vui lòng thử lại.";
+      }
+
+      setErrors(next);
+      messageApi.error(next.email || next.password || next.form);
       setLoading(false);
       setIsLoggingIn(false);
     }
   };
 
+  const fade = reduceMotion
+    ? {}
+    : { initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 } };
+
   return (
-    <div className="min-h-screen flex bg-white font-sans">
-      {/* contextHolder để hiển thị message */}
+    <div className="min-h-screen flex bg-ivory font-roboto text-nero">
       {contextHolder}
 
-      {/* --- CỘT TRÁI: ẢNH BRANDING (Ẩn trên Mobile) --- */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900 items-center justify-center overflow-hidden">
-        {/* Background Image with Overlay */}
-        <div className="absolute inset-0 z-0">
-          <img
-            src="https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=2000&auto=format&fit=crop"
-            alt="Furniture Background"
-            className="w-full h-full object-cover opacity-60"
+      {/* ─────────────────────────────────────────────
+          LEFT · EDITORIAL PANEL (lg+)
+          ───────────────────────────────────────────── */}
+      <aside className="relative hidden lg:flex lg:w-[55%] overflow-hidden bg-nero">
+        {/* Ken-burns interior image */}
+        <div className="absolute inset-0">
+          <div
+            className="absolute inset-0 bg-cover bg-center motion-safe:animate-ken-burns"
+            style={{
+              backgroundImage:
+                "url('https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?q=80&w=2400&auto=format&fit=crop')",
+            }}
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-nero via-nero/55 to-nero/30" />
+          <div className="absolute inset-0 bg-gradient-to-r from-nero/40 via-transparent to-transparent" />
         </div>
 
-        {/* Branding Content */}
-        <div className="relative z-10 text-white p-12 max-w-lg">
-          <h1 className="text-5xl font-extrabold mb-6 tracking-tight">
-            NPH <span className="text-blue-500">STORE</span>
-          </h1>
-          <p className="text-lg text-gray-200 leading-relaxed mb-8">
-            Khám phá bộ sưu tập nội thất đẳng cấp, kiến tạo không gian sống mơ
-            ước của bạn với những thiết kế tinh tế nhất.
-          </p>
-        </div>
-      </div>
+        {/* Corner brackets — brand motif */}
+        <span className="pointer-events-none absolute top-10 left-10 h-12 w-12 border-t border-l border-champagne/40" />
+        <span className="pointer-events-none absolute bottom-10 right-10 h-12 w-12 border-b border-r border-champagne/40" />
 
-      {/* --- CỘT PHẢI: FORM LOGIN --- */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 md:p-12 relative">
-        {/* Nút Back Home */}
+        {/* Brand mark */}
         <Link
           to="/"
-          className="absolute top-6 left-6 md:top-10 md:left-10 text-gray-500 hover:text-gray-900 flex items-center gap-2 transition-colors"
+          className="absolute top-10 left-12 z-10 font-roboto text-4xl font-extrabold uppercase tracking-tight text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/60 focus-visible:ring-offset-4 focus-visible:ring-offset-nero"
         >
-          <ArrowLeft size={20} />{" "}
-          <span className="text-sm font-medium">Trang chủ</span>
+          NPH <span className="text-champagne">Store</span>
         </Link>
 
-        <div className="w-full max-w-md space-y-8">
-          <div className="text-center lg:text-left">
-            <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
-              Chào mừng trở lại! 👋
-            </h2>
-            <p className="mt-2 text-sm text-gray-500">
-              Vui lòng nhập thông tin đăng nhập của bạn để tiếp tục.
-            </p>
+        {/* Editorial copy */}
+        <div className="relative z-10 mt-auto mb-4 p-12 xl:p-16 max-w-3xl">
+          <p
+            className="font-roboto font-extrabold uppercase leading-[1.1] tracking-tight text-white"
+            style={{ fontSize: "clamp(1.75rem, 3vw, 2.75rem)" }}
+          >
+            Mỗi không gian đều bắt đầu
+            <br />
+            <span className="text-champagne">từ một lựa chọn tinh tế</span>
+          </p>
+          <p className="mt-6 text-sm font-light tracking-wide text-white/55">
+            Nội thất cao cấp · Thiết kế tối giản · Trải nghiệm đỉnh cao
+          </p>
+        </div>
+      </aside>
+
+      {/* ─────────────────────────────────────────────
+          RIGHT · FORM
+          ───────────────────────────────────────────── */}
+      <main className="relative flex w-full flex-col px-6 py-8 sm:px-10 lg:w-[45%] lg:px-16">
+        {/* Top bar: mobile brand + back link */}
+        <div className="flex items-center justify-between">
+          <Link
+            to="/"
+            className="font-roboto text-lg font-extrabold uppercase tracking-tight text-nero lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory"
+          >
+            NPH <span className="text-champagne">Store</span>
+          </Link>
+          <Link
+            to="/"
+            className="group ml-auto inline-flex items-center gap-2 text-sm text-smoke transition-colors hover:text-nero focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory"
+          >
+            <ArrowLeft
+              size={16}
+              className="transition-transform duration-300 group-hover:-translate-x-0.5"
+            />
+            Trang chủ
+          </Link>
+        </div>
+
+        {/* Centered form block */}
+        <motion.div
+          {...fade}
+          transition={{ duration: 0.7, ease: LUXURY_EASE }}
+          className="mx-auto flex w-full max-w-[420px] flex-1 flex-col justify-center py-10"
+        >
+          {/* Heading */}
+          <div className="mb-9">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="inline-block h-px w-8 bg-champagne" />
+              <span className="font-roboto text-[11px] font-semibold uppercase tracking-[0.3em] text-champagne">
+                Đăng nhập
+              </span>
+            </div>
+            <h1
+              className="font-roboto font-extrabold uppercase leading-[1.1] tracking-tight text-nero"
+              style={{ fontSize: "clamp(2rem, 4vw, 2.75rem)" }}
+            >
+              Chào mừng
+              <br />
+              trở lại
+            </h1>
           </div>
 
           {!isLoggingIn ? (
-            <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-              <div className="space-y-5">
-                {/* Email Input */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Email
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="email"
-                      required
-                      disabled={loading}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all sm:text-sm"
-                      placeholder="name@example.com"
-                    />
-                  </div>
+            <form className="space-y-7" onSubmit={handleLogin} noValidate>
+              {/* Email */}
+              <div>
+                <label
+                  htmlFor="email"
+                  className="mb-2.5 block font-roboto text-[11px] font-semibold uppercase tracking-[0.2em] text-smoke"
+                >
+                  Email
+                </label>
+                <div className="relative">
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    disabled={loading}
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (errors.email || errors.form)
+                        setErrors((p) => ({ ...p, email: "", form: "" }));
+                    }}
+                    aria-invalid={!!errors.email}
+                    aria-describedby={errors.email ? "email-error" : undefined}
+                    placeholder="name@example.com"
+                    className={`peer w-full border-0 border-b bg-transparent pb-2.5 text-[15px] text-nero placeholder-smoke/40 transition-colors focus:outline-none disabled:opacity-50 ${errors.email
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-whisper focus:border-champagne"
+                      }`}
+                  />
+                  <span
+                    className={`pointer-events-none absolute bottom-0 left-0 h-px w-full origin-left scale-x-0 transition-transform duration-500 ease-out peer-focus:scale-x-100 ${errors.email ? "bg-red-500" : "bg-champagne"
+                      }`}
+                  />
                 </div>
-
-                {/* Password Input */}
-                <div>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      disabled={loading}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all sm:text-sm"
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-gray-400 hover:text-gray-600 focus:outline-none"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Mật khẩu
-                    </label>
-                    <Link
-                      to="/forgot-password"
-                      className="text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline"
-                    >
-                      Quên mật khẩu?
-                    </Link>
-                  </div>
-                </div>
+                {errors.email && (
+                  <p
+                    id="email-error"
+                    role="alert"
+                    className="mt-2 text-xs text-red-600"
+                  >
+                    {errors.email}
+                  </p>
+                )}
               </div>
 
-              <div className="flex items-center">
+              {/* Password */}
+              <div>
+                <div className="mb-2.5 flex items-baseline justify-between">
+                  <label
+                    htmlFor="password"
+                    className="font-roboto text-[11px] font-semibold uppercase tracking-[0.2em] text-smoke"
+                  >
+                    Mật khẩu
+                  </label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs text-smoke underline-offset-4 transition-colors hover:text-champagne hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory"
+                  >
+                    Quên mật khẩu?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    disabled={loading}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errors.password || errors.form)
+                        setErrors((p) => ({ ...p, password: "", form: "" }));
+                    }}
+                    aria-invalid={!!errors.password}
+                    aria-describedby={errors.password ? "password-error" : undefined}
+                    placeholder="••••••••"
+                    className={`peer w-full border-0 border-b bg-transparent pb-2.5 pr-10 text-[15px] text-nero placeholder-smoke/40 transition-colors focus:outline-none disabled:opacity-50 ${errors.password
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-whisper focus:border-champagne"
+                      }`}
+                  />
+                  <span
+                    className={`pointer-events-none absolute bottom-0 left-0 h-px w-full origin-left scale-x-0 transition-transform duration-500 ease-out peer-focus:scale-x-100 ${errors.password ? "bg-red-500" : "bg-champagne"
+                      }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    aria-pressed={showPassword}
+                    className="absolute bottom-2 right-0 text-smoke transition-colors hover:text-nero focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {errors.password && (
+                  <p
+                    id="password-error"
+                    role="alert"
+                    className="mt-2 text-xs text-red-600"
+                  >
+                    {errors.password}
+                  </p>
+                )}
+              </div>
+
+              {/* Remember */}
+              <label className="group inline-flex cursor-pointer select-none items-center gap-3">
                 <input
-                  id="remember-me"
-                  name="remember-me"
                   type="checkbox"
                   checked={remember}
                   onChange={(e) => setRemember(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                  className="peer sr-only"
                 />
-                <label
-                  htmlFor="remember-me"
-                  className="ml-2 block text-sm text-gray-900 cursor-pointer select-none"
+                <span
+                  className={`flex h-[18px] w-[18px] items-center justify-center border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-champagne/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-ivory ${remember
+                    ? "border-nero bg-nero"
+                    : "border-whisper bg-white group-hover:border-smoke"
+                    }`}
                 >
-                  Ghi nhớ đăng nhập
-                </label>
-              </div>
+                  {remember && (
+                    <Check size={12} strokeWidth={3} className="text-ivory" />
+                  )}
+                </span>
+                <span className="text-sm text-nero">Ghi nhớ đăng nhập</span>
+              </label>
 
+              {/* Submit */}
               <button
                 type="submit"
-                disabled={loading}
-                className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-all transform hover:-translate-y-0.5 ${
-                  loading ? "opacity-70 cursor-not-allowed" : ""
-                }`}
+                disabled={loading || !isFormValid}
+                className="group relative flex w-full items-center justify-center gap-2.5 bg-champagne py-4 font-roboto text-xs font-bold uppercase tracking-[0.18em] text-nero transition-all duration-500 hover:shadow-[0_0_40px_rgba(200,169,110,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nero focus-visible:ring-offset-2 focus-visible:ring-offset-ivory disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
               >
                 {loading ? (
-                  <Spin size="small" className="mr-2 custom-spin-white" />
+                  <>
+                    <Spin size="small" />
+                    Đang xử lý...
+                  </>
                 ) : (
-                  <LogIn size={18} className="mr-2" />
+                  <>
+                    Đăng nhập
+                    <ArrowRight
+                      size={16}
+                      className="transition-transform duration-300 group-hover:translate-x-1"
+                    />
+                  </>
                 )}
-                {loading ? "Đang xử lý..." : "Đăng nhập"}
               </button>
-            </form>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-10 space-y-4">
-              <Spin size="large" />
-              <p className="text-gray-500">Đang chuyển hướng...</p>
-            </div>
-          )}
 
-          {!isLoggingIn && (
-            <>
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Hoặc</span>
-                </div>
+              {/* Divider */}
+              <div className="flex items-center gap-4 py-1">
+                <span className="h-px flex-1 bg-whisper" />
+                <span className="font-roboto text-[10px] font-semibold uppercase tracking-[0.25em] text-smoke">
+                  Hoặc
+                </span>
+                <span className="h-px flex-1 bg-whisper" />
               </div>
 
+              {/* Google */}
               <a
                 href="/oauth2/authorization/google"
-                className="w-full flex justify-center items-center gap-2 border border-gray-300 rounded-xl bg-white text-gray-700 px-4 py-3 shadow-sm hover:bg-gray-50 transition-colors font-medium text-sm"
+                className="flex w-full items-center justify-center gap-3 border border-whisper bg-white py-3.5 text-sm font-medium text-nero transition-colors hover:border-smoke/50 hover:bg-ivory focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory"
               >
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
                   <path
                     fill="#EA4335"
                     d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114A5.96 5.96 0 0 1 8 12.557a5.96 5.96 0 0 1 5.991-5.96c1.523 0 2.9.575 3.96 1.503l3.08-3.08C19.123 3.14 16.745 2 13.991 2 8.18 2 3.5 6.7 3.5 12.5s4.68 10.5 10.491 10.5c5.783 0 9.872-3.984 9.872-9.752 0-.616-.067-1.2-.187-1.748L12.24 10.285z"
@@ -262,32 +418,34 @@ export default function Login() {
                 </svg>
                 Đăng nhập bằng Google
               </a>
-            </>
+
+              {/* Register */}
+              <p className="pt-2 text-center text-sm text-smoke">
+                Chưa có tài khoản?{" "}
+                <Link
+                  to="/register"
+                  className="font-semibold text-nero underline-offset-4 transition-colors hover:text-champagne hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory"
+                >
+                  Tạo tài khoản mới
+                </Link>
+              </p>
+            </form>
+          ) : (
+            // Success / redirecting state
+            <div className="flex flex-col items-center justify-center gap-5 py-16 text-center">
+              <Spin size="large" />
+              <div>
+                <p className="font-roboto text-sm font-semibold uppercase tracking-[0.2em] text-nero">
+                  Đăng nhập thành công
+                </p>
+                <p className="mt-2 text-sm text-smoke">
+                  Đang chuyển hướng bạn vào không gian riêng…
+                </p>
+              </div>
+            </div>
           )}
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">
-                  Chưa có tài khoản?
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <Link
-                to="/register"
-                className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Đăng ký tài khoản mới
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+        </motion.div>
+      </main>
     </div>
   );
 }

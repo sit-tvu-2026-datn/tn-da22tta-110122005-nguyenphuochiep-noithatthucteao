@@ -39,7 +39,7 @@ export default function FeaturedCategories() {
   return (
     <section
       id="featured-categories"
-      className="font-montserrat py-20 sm:py-28 bg-ivory"
+      className="font-roboto py-20 sm:py-28 bg-ivory"
       style={{
         marginLeft: "calc(-50vw + 50%)",
         marginRight: "calc(-50vw + 50%)",
