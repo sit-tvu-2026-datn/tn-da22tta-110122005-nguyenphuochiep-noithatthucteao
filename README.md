@@ -1,11 +1,10 @@
 # XÂY DỰNG HỆ THỐNG BÁN NỘI THẤT KẾT HỢP HỖ TRỢ TRẢI NGHIỆM THỰC TẾ ẢO VÀ TƯ VẤN TỰ ĐỘNG
 
-Thông tin
-Loại: Đồ án tốt nghiệp khoá 2022
-Giảng viên hướng dẫn: ThS. Phạm Minh Đương
-
-Sinh viên thực hiện: Nguyễn Phước Hiệp - 110122005 - DA22TTA
-Email: nphhiep1301@gmail.com
+Thông tin  
+Loại: Đồ án tốt nghiệp khoá 2022  
+Giảng viên hướng dẫn: ThS. Phạm Minh Đương  
+Sinh viên thực hiện: Nguyễn Phước Hiệp - 110122005 - DA22TTA  
+Email: nphhiep1301@gmail.com  
 
 # 🧰 Tech Stack
 | Công nghệ |
