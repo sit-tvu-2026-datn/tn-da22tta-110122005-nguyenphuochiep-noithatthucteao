@@ -462,18 +462,14 @@ export default function Products() {
 
     return (
       <div
-        className={`group bg-white rounded-xl border ${
-          isFsSection
-            ? "border-orange-200 shadow-md min-w-[220px]"
-            : "border-gray-100"
+        className={`group bg-white rounded-xl border border-gray-100 ${
+          isFsSection ? "min-w-[220px]" : ""
         } overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col relative`}
       >
         <div className="relative pt-[100%] bg-gray-100 overflow-hidden">
           {discountPercent > 0 && !isOutOfStock && (
             <div
-              className={`absolute top-2 left-2 z-10 text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 ${
-                isFlashSale ? "bg-orange-600" : "bg-red-500"
-              }`}
+              className="absolute top-2 left-2 z-10 text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 bg-red-500"
             >
               {isFlashSale && <Zap size={10} fill="currentColor" />} -
               {discountPercent}%
@@ -530,9 +526,9 @@ export default function Products() {
 
           {isFlashSale && isFsSection && !isOutOfStock && (
             <div className="mb-3">
-              <div className="relative w-full h-3 bg-orange-100 rounded-full overflow-hidden">
+              <div className="relative w-full h-3 bg-red-100 rounded-full overflow-hidden">
                 <div
-                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-500 to-red-500"
+                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-red-500 to-red-600"
                   style={{ width: `${soldPercent}%` }}
                 ></div>
                 <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white uppercase drop-shadow-md">
@@ -546,11 +542,7 @@ export default function Products() {
             <div className="flex gap-2 items-baseline flex-wrap">
               <span
                 className={`font-bold text-base sm:text-lg ${
-                  isOutOfStock
-                    ? "text-gray-400"
-                    : isFlashSale
-                      ? "text-orange-600"
-                      : "text-red-600"
+                  isOutOfStock ? "text-gray-400" : "text-red-600"
                 }`}
               >
                 {finalPrice?.toLocaleString("vi-VN")}₫
@@ -566,12 +558,7 @@ export default function Products() {
           {!isOutOfStock && (
             <button
               onClick={() => handleAddToCart(prod)}
-              className={`mt-3 w-full text-xs font-bold py-2 rounded-lg transition 
-                        ${
-                          isFlashSale
-                            ? "bg-orange-100 text-orange-600 hover:bg-orange-600 hover:text-white lg:hidden"
-                            : "bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white lg:hidden"
-                        }`}
+              className="mt-3 w-full text-xs font-bold py-2 rounded-lg transition bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white lg:hidden"
             >
               {isFlashSale ? "MUA NGAY" : "THÊM VÀO GIỎ"}
             </button>
@@ -652,7 +639,7 @@ export default function Products() {
         {/* FLASH SALE AREA */}
         {flashSale && flashSaleList.length > 0 && (
           <div className="mt-6 mb-8">
-            <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-t-xl p-4 flex flex-wrap items-center justify-between text-white shadow-lg gap-4">
+            <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-t-xl p-4 flex flex-wrap items-center justify-between text-white shadow-lg gap-4">
               <div className="flex items-center gap-3">
                 <ThunderboltFilled className="text-3xl text-yellow-300 animate-pulse" />
                 <div>
@@ -665,7 +652,7 @@ export default function Products() {
               <FlashSaleTimer endDate={flashSale.endDate} />
             </div>
 
-            <div className="bg-orange-50 border-x border-b border-orange-200 p-4 rounded-b-xl shadow-sm">
+            <div className="bg-white border-x border-b border-gray-100 p-4 rounded-b-xl shadow-sm">
               <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-hide">
                 {flashSaleList.map((prod) => (
                   <div

@@ -73,7 +73,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.7, ease: LUXURY_EASE }}
-          className="text-white/60 font-light tracking-wide max-w-lg mx-auto mb-10"
+          className="text-white/80 font-normal tracking-wide max-w-2xl mx-auto mb-10"
           style={{ fontSize: "clamp(0.875rem, 1.5vw, 1.125rem)" }}
         >
           Nội thất cao cấp, thiết kế tối giản, trải nghiệm đỉnh cao cho mọi

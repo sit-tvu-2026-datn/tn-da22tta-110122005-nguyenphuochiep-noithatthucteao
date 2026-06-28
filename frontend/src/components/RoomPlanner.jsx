@@ -7,6 +7,7 @@ import {
   useGLTF,
 } from "@react-three/drei";
 import * as THREE from "three";
+import { motion, AnimatePresence } from "framer-motion";
 import api from "../config/api";
 
 /* ─────────────────── EMOJI MAPPER ─────────────────── */
@@ -214,44 +215,68 @@ function useGroundedModel(item, dimsMapRef) {
       }
     });
 
-    // Natural bounding box at scale 1.
+    // ── STEP 1 · MEASURE (raw) — the model's size at scale 1 / rotation 0, in
+    //   whatever units the GLB was authored in. Flush world matrices FIRST so
+    //   Box3 reads final matrices, not stale ones.
+    c.position.set(0, 0, 0);
+    c.rotation.set(0, 0, 0);
     c.scale.set(1, 1, 1);
     c.updateMatrixWorld(true);
     let box = new THREE.Box3().setFromObject(c);
-    const size = new THREE.Vector3();
-    box.getSize(size);
+    const rawSize = box.getSize(new THREE.Vector3());
 
-    // DB width, height, length are in cm → meters.
-    const targetWidth = (item.width || 80) / 100;
-    const targetHeight = (item.height || 75) / 100;
-    const targetLength = (item.length || 120) / 100;
+    // ── STEP 2 · TARGET — DB stores cm, the scene works in METRES, so ÷100.
+    //   Axis convention: X = width (sofa length), Y = height, Z = depth.
+    const targetSize = {
+      width: (item.width || 80) / 100,   // → X
+      height: (item.height || 75) / 100, // → Y
+      depth: (item.length || 120) / 100, // → Z
+    };
 
-    // Uniform scale to avoid warping. Prefer matching height; fall back to the
-    // horizontal average for flat items (rugs, mats).
-    let scale = 1;
-    if (size.y > 0.15 && targetHeight > 0.15) {
-      scale = targetHeight / size.y;
-    } else {
-      const scaleX = targetWidth / (size.x || 1);
-      const scaleZ = targetLength / (size.z || 1);
-      scale = (scaleX + scaleZ) / 2;
+    // ── STEP 3 · ORIENT — if the product is clearly elongated on one horizontal
+    //   axis but the GLB's long side sits on the OTHER axis, rotate 90° about Y
+    //   so the sofa's length lands on X. Rotation MUST happen before the Box3 we
+    //   scale from. Square-ish items (width ≈ depth) never trigger this.
+    const targetLongX = targetSize.width > targetSize.depth * 1.15;
+    const targetLongZ = targetSize.depth > targetSize.width * 1.15;
+    const modelLongX = rawSize.x > rawSize.z * 1.05;
+    const modelLongZ = rawSize.z > rawSize.x * 1.05;
+    if ((targetLongX && modelLongZ) || (targetLongZ && modelLongX)) {
+      c.rotation.y = Math.PI / 2;
     }
 
-    c.scale.set(scale, scale, scale);
+    // Re-measure AFTER the orientation fix — Box3 comes after the rotation.
     c.updateMatrixWorld(true);
-
-    // Recompute the SCALED box, then ground: centre X/Z, drop bottom to y = 0.
     box = new THREE.Box3().setFromObject(c);
-    const center = box.getCenter(new THREE.Vector3());
-    const gsize = box.getSize(new THREE.Vector3());
-    c.position.x -= center.x;
-    c.position.z -= center.z;
+    const size = box.getSize(new THREE.Vector3());
+
+    // ── STEP 4 · UNIFORM SCALE — ONE factor for all three axes so the model's
+    //   real proportions are preserved (cushions / arms / back never stretch).
+    //   min(ratios) keeps the whole sofa inside the target box without distorting
+    //   it. Switch to (targetSize.width / size.x) if matching length is critical.
+    const scaleX = targetSize.width / (size.x || 1);
+    const scaleY = targetSize.height / (size.y || 1);
+    const scaleZ = targetSize.depth / (size.z || 1);
+    const uniformScale = Math.min(scaleX, scaleY, scaleZ);
+    c.scale.setScalar(uniformScale); // model ROOT only — child meshes keep their
+                                     // relative transforms, so nothing warps.
+
+    // ── STEP 5 · GROUND — re-measure post-scale, centre the footprint on X/Z and
+    //   drop the BOTTOM onto the floor (y = 0). Use box.min.y, not the box centre.
+    //   All in the wrapper-local frame (the wrapper sits at the origin).
+    c.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(c);
+    const finalSize = box.getSize(new THREE.Vector3());
+    const finalCenter = box.getCenter(new THREE.Vector3());
+    c.position.x -= finalCenter.x;
+    c.position.z -= finalCenter.z;
     c.position.y -= box.min.y;
+    c.updateMatrixWorld(true);
 
     const wrapper = new THREE.Group();
     wrapper.add(c);
 
-    const dims = { hx: gsize.x / 2, hz: gsize.z / 2, height: gsize.y };
+    const dims = { hx: finalSize.x / 2, hz: finalSize.z / 2, height: finalSize.y };
     if (dimsMapRef) dimsMapRef.current[item.id] = dims;
 
     return { object: wrapper, dims };
@@ -509,26 +534,57 @@ function TransformWrapper({
   );
 }
 
+/* ─────────────────── CAMERA FIT HELPERS ───────────────────
+ *
+ *  Both cameras are framed from the ROOM dimensions (never a product's bounding
+ *  box) with a moderate FOV (≤50°) so furniture near the lens isn't
+ *  perspective-exaggerated. The exterior distance is solved from the room's
+ *  bounding sphere so the whole room fits whatever the sliders are set to.
+ */
+const EXTERIOR_FOV = 48;
+const INTERIOR_FOV = 50;
+
+function fitExteriorCamera(W, L, H) {
+  const radius = 0.5 * Math.sqrt(W * W + H * H + L * L);
+  const dist = (radius / Math.sin((EXTERIOR_FOV * 0.5 * Math.PI) / 180)) * 1.15;
+  const dx = 0.66, dy = 0.36, dz = 0.66; // diagonal view, slightly raised
+  const dl = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  return {
+    fov: EXTERIOR_FOV,
+    position: [(dx / dl) * dist, H * 0.5 + (dy / dl) * dist, (dz / dl) * dist],
+    target: [0, H * 0.45, 0],
+  };
+}
+
+function fitInteriorCamera(W, L, H) {
+  return {
+    fov: INTERIOR_FOV,
+    position: [0, H * 0.5, L * 0.48], // just inside the front wall
+    target: [0, H * 0.42, -L * 0.15],
+  };
+}
+
 /* ─────────────────── CAMERA CONTROLLER ─────────────────── */
 
 function CameraController({ viewMode, roomWidth, roomLength, roomHeight, controlsRef }) {
   const { camera } = useThree();
 
   useEffect(() => {
-    if (viewMode === "exterior") {
-      camera.position.set(roomWidth * 1.2, roomHeight * 1.1, roomLength * 1.2);
-      camera.fov = 50;
-    } else {
-      camera.position.set(0, roomHeight * 0.5, roomLength * 0.3);
-      camera.fov = 80;
-    }
+    // Clip planes sized for a metres-scale scene.
+    camera.near = 0.1;
+    camera.far = 100;
+
+    const cfg =
+      viewMode === "exterior"
+        ? fitExteriorCamera(roomWidth, roomLength, roomHeight)
+        : fitInteriorCamera(roomWidth, roomLength, roomHeight);
+
+    camera.position.set(cfg.position[0], cfg.position[1], cfg.position[2]);
+    camera.fov = cfg.fov;
     camera.updateProjectionMatrix();
+    camera.lookAt(cfg.target[0], cfg.target[1], cfg.target[2]);
     if (controlsRef.current) {
-      controlsRef.current.target.set(
-        0,
-        viewMode === "interior" ? roomHeight * 0.4 : roomHeight / 3,
-        viewMode === "interior" ? -roomLength * 0.1 : 0
-      );
+      controlsRef.current.target.set(cfg.target[0], cfg.target[1], cfg.target[2]);
       controlsRef.current.update();
     }
   }, [viewMode, roomWidth, roomLength, roomHeight, camera, controlsRef]);
@@ -541,8 +597,8 @@ function CameraController({ viewMode, roomWidth, roomLength, roomHeight, control
 function Slider({ label, value, min, max, step, onChange, unit = "m" }) {
   const percent = ((value - min) / (max - min)) * 100;
   return (
-    <div className="mb-3">
-      <div className="flex justify-between text-xs mb-1 text-amber-200/70">
+    <div className="mb-4">
+      <div className="flex justify-between text-[13px] mb-1.5 text-amber-200/80">
         <span>{label}</span>
         <span className="font-semibold text-amber-100">{value}{unit}</span>
       </div>
@@ -553,7 +609,7 @@ function Slider({ label, value, min, max, step, onChange, unit = "m" }) {
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1 rounded-full appearance-none cursor-pointer accent-amber-400"
+        className="r3d-range w-full cursor-pointer accent-amber-400"
         style={{
           background: `linear-gradient(to right, #f59e0b ${percent}%, #44403c ${percent}%)`,
         }}
@@ -562,11 +618,167 @@ function Slider({ label, value, min, max, step, onChange, unit = "m" }) {
   );
 }
 
+/* ─────────────────── RESPONSIVE HOOK ───────────────────
+ *
+ *  Single source of truth for the layout. Three tiers:
+ *    mobile  < 768px   → topbar + full-bleed canvas + bottom nav; panels are
+ *                        a left drawer (controls) and a bottom sheet (catalog).
+ *    tablet  768–1024  → 280px sidebar + canvas + compact catalog bar.
+ *    desktop > 1024px  → 320px sidebar + canvas + catalog bar.
+ *
+ *  Resize is debounced through requestAnimationFrame so dragging the window
+ *  edge doesn't thrash React state.
+ */
+const MOBILE_MAX = 768;
+const TABLET_MAX = 1024;
+
+function readBreakpoint() {
+  const w = typeof window !== "undefined" ? window.innerWidth : 1280;
+  if (w < MOBILE_MAX) return "mobile";
+  if (w < TABLET_MAX) return "tablet";
+  return "desktop";
+}
+
+function useBreakpoint() {
+  const [bp, setBp] = useState(readBreakpoint);
+  useEffect(() => {
+    let raf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setBp(readBreakpoint()));
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
+  return {
+    bp,
+    isMobile: bp === "mobile",
+    isTablet: bp === "tablet",
+    isDesktop: bp === "desktop",
+  };
+}
+
+/* ─────────────────── OVERLAY SHELLS (mobile) ───────────────────
+ *
+ *  Drawer (left) and BottomSheet, both transform-animated (GPU friendly) and
+ *  swipe-to-dismiss via framer-motion drag. They mount only while open so the
+ *  heavy panel content isn't rendered behind the scenes (lazy).
+ */
+const SHEET_EASE = [0.22, 1, 0.36, 1];
+
+// Shared overlay close button.
+function SheetClose({ onClose }) {
+  return (
+    <button
+      onClick={onClose}
+      aria-label="Đóng"
+      className="w-11 h-11 -mr-2 flex items-center justify-center rounded-lg text-stone-400 hover:text-white text-xl leading-none"
+    >
+      ✕
+    </button>
+  );
+}
+
+function Drawer({ open, onClose, title, children }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div key="drawer" className="fixed inset-0 z-40">
+          {/* Backdrop */}
+          <motion.div
+            className="absolute inset-0 bg-black/60"
+            style={{ backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+          />
+          {/* Panel */}
+          <motion.aside
+            className="absolute inset-y-0 left-0 flex flex-col bg-stone-950 border-r border-amber-900/30 shadow-2xl"
+            style={{
+              width: "min(80vw, 320px)",
+              paddingTop: "env(safe-area-inset-top)",
+              paddingBottom: "env(safe-area-inset-bottom)",
+            }}
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "tween", ease: SHEET_EASE, duration: 0.3 }}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={{ left: 0.4, right: 0 }}
+            onDragEnd={(_, info) => info.offset.x < -60 && onClose()}
+          >
+            <div className="flex items-center justify-between px-4 h-14 border-b border-amber-900/30 shrink-0">
+              <span className="text-sm font-bold tracking-widest uppercase text-amber-400">{title}</span>
+              <SheetClose onClose={onClose} />
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{children}</div>
+          </motion.aside>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function BottomSheet({ open, onClose, title, children }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div key="sheet" className="fixed inset-0 z-40">
+          {/* Backdrop */}
+          <motion.div
+            className="absolute inset-0 bg-black/60"
+            style={{ backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+          />
+          {/* Sheet */}
+          <motion.div
+            className="absolute inset-x-0 bottom-0 flex flex-col bg-stone-950 border-t border-amber-900/30 rounded-t-2xl shadow-2xl"
+            style={{ maxHeight: "min(78vh, 600px)", paddingBottom: "env(safe-area-inset-bottom)" }}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "tween", ease: SHEET_EASE, duration: 0.3 }}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.4 }}
+            onDragEnd={(_, info) => info.offset.y > 90 && onClose()}
+          >
+            <div className="flex justify-center pt-2.5 pb-1 shrink-0 cursor-grab active:cursor-grabbing">
+              <span className="w-10 h-1.5 rounded-full bg-stone-700" />
+            </div>
+            <div className="flex items-center justify-between px-5 pb-2.5 shrink-0">
+              <span className="text-sm font-bold tracking-widest uppercase text-amber-400">{title}</span>
+              <SheetClose onClose={onClose} />
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{children}</div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 /* ─────────────────── MAIN ─────────────────── */
 
 export default function RoomPlanner() {
-  const [width, setWidth] = useState(5);
-  const [length, setLength] = useState(6);
+  const { isMobile, isTablet } = useBreakpoint();
+  const [drawerOpen, setDrawerOpen] = useState(false);   // mobile: control-panel drawer
+  const [catalogOpen, setCatalogOpen] = useState(false); // mobile: catalog bottom sheet
+  // Room size in METRES (1 Three.js unit = 1 m). Defaults to the reference
+  // room: Rộng (X) 2.5 · Dài (Z) 3 · Cao (Y) 3.
+  const [width, setWidth] = useState(2.5);
+  const [length, setLength] = useState(3);
   const [height, setHeight] = useState(3);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -611,6 +823,15 @@ export default function RoomPlanner() {
         setLoading(false);
       });
   }, []);
+
+  // Collapse mobile overlays the moment we grow into the tablet/desktop layout
+  // (where the sidebar + catalog bar are always visible).
+  useEffect(() => {
+    if (!isMobile) {
+      setDrawerOpen(false);
+      setCatalogOpen(false);
+    }
+  }, [isMobile]);
 
   // ★ Shared ref map: TransformWrapper writes here on every objectChange
   //   so that toggleLock can read the latest Three.js transform at any time.
@@ -705,109 +926,68 @@ export default function RoomPlanner() {
     { mode: "scale",     icon: "⤢",  label: "Kích cỡ" },
   ];
 
-  return (
-    <div
-      className="h-screen overflow-hidden text-white"
-      style={{
-        display: "grid",
-        gridTemplateRows: "52px 1fr 160px",
-        gridTemplateColumns: "264px 1fr",
-        gridTemplateAreas: '"topbar topbar" "sidebar canvas" "sidebar bottom"',
-        background: "#1a1410",
-        fontFamily: "'DM Sans', sans-serif",
-      }}
-    >
+  /* ── Layout metrics per breakpoint — single source of truth for the CSS grid.
+        Mobile rows fold the iOS safe-area insets into the track sizes so the
+        topbar/bottom-nav clear the notch & home indicator without overflowing. ── */
+  const SIDEBAR_W = isTablet ? 280 : 320;
+  const TOPBAR_H = isMobile ? 52 : 56;
+  const BOTTOM_H = isTablet ? 134 : 150;
+  const layoutStyle = isMobile
+    ? {
+        gridTemplateRows: `calc(${TOPBAR_H}px + env(safe-area-inset-top)) 1fr calc(64px + env(safe-area-inset-bottom))`,
+        gridTemplateColumns: "1fr",
+        gridTemplateAreas: '"topbar" "canvas" "bottom"',
+      }
+    : {
+        gridTemplateRows: `${TOPBAR_H}px 1fr ${BOTTOM_H}px`,
+        gridTemplateColumns: `${SIDEBAR_W}px 1fr`,
+        gridTemplateAreas: '"topbar topbar" "sidebar canvas" "bottom bottom"',
+      };
 
-      {/* ── TOPBAR ── */}
-      <header
-        style={{ gridArea: "topbar" }}
-        className="flex items-center justify-between px-5 border-b border-amber-900/30 bg-stone-950/95 z-20"
-      >
-        {/* Brand */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
-               style={{ background: "linear-gradient(135deg,#d4a853,#c96b3a)", boxShadow: "0 0 14px rgba(212,168,83,.35)" }}>
-            🏠
-          </div>
-          <span className="font-bold text-base tracking-tight">
-            Room<span className="text-amber-400 italic">3D</span>
-          </span>
-        </div>
+  // Open the control panel (mobile drawer) focused on a given tab.
+  const openPanel = (tab) => {
+    setSidebarTab(tab);
+    setDrawerOpen(true);
+  };
 
-        {/* View toggle */}
-        <div className="flex bg-stone-900/80 border border-amber-900/30 rounded-lg p-1 gap-1">
-          {[
-            { id: "exterior", icon: "🌐", label: "Tổng quan" },
-            { id: "interior", icon: "🏠", label: "Bên trong" },
-          ].map((v) => (
-            <button
-              key={v.id}
-              onClick={() => setViewMode(v.id)}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                viewMode === v.id
-                  ? "text-stone-950 font-semibold shadow"
-                  : "text-stone-400 hover:text-stone-200"
-              }`}
-              style={
-                viewMode === v.id
-                  ? { background: "linear-gradient(135deg,#d4a853,#c96b3a)", boxShadow: "0 2px 8px rgba(212,168,83,.3)" }
-                  : {}
-              }
-            >
-              <span>{v.icon}</span>
-              <span>{v.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Stats */}
-        <div className="flex items-center gap-2">
-          {[
-            { label: "Diện tích", value: `${(width * length).toFixed(1)} m²` },
-            { label: "Thể tích",  value: `${(width * length * height).toFixed(1)} m³` },
-            { label: "Nội thất",  value: `${objects.length} vật` },
-          ].map((s) => (
-            <div key={s.label} className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber-900/30 bg-stone-900/60 text-xs text-stone-400">
-              {s.label} <strong className="text-amber-400 font-semibold">{s.value}</strong>
-            </div>
-          ))}
-        </div>
-      </header>
-
-      {/* ── SIDEBAR ── */}
-      <aside
-        style={{ gridArea: "sidebar" }}
-        className="flex flex-col border-r border-amber-900/30 bg-stone-950/95 overflow-hidden"
-      >
+  /* ── Control panel (Room / Tools / Objects). Shared verbatim by the desktop
+        sidebar and the mobile drawer. `dense` = compact desktop type scale;
+        mobile bumps body copy to ≥14px and pads tap targets to 44px. ── */
+  const controlPanel = (dense) => {
+    const secLabel = dense ? "text-[9px]" : "text-[11px]";
+    const body = dense ? "text-xs" : "text-sm";
+    const micro = dense ? "text-[11px]" : "text-[13px]";
+    const tap = dense ? "" : "min-h-[44px]";
+    return (
+      <>
         {/* Tabs */}
         <div className="flex border-b border-amber-900/30 bg-stone-900/40 shrink-0">
           {[
             { id: "room",    icon: "📐", label: "PHÒNG" },
             { id: "tools",   icon: "🎮", label: "CÔNG CỤ" },
             { id: "objects", icon: "📦", label: `DS (${objects.length})` },
-          ].map((t) => (
+          ].map((tb) => (
             <button
-              key={t.id}
-              onClick={() => setSidebarTab(t.id)}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-semibold tracking-widest border-b-2 transition-all ${
-                sidebarTab === t.id
+              key={tb.id}
+              onClick={() => setSidebarTab(tb.id)}
+              className={`flex-1 flex flex-col items-center gap-0.5 ${dense ? "py-2.5 text-[10px]" : "py-3 text-xs"} font-semibold tracking-widest border-b-2 transition-all ${
+                sidebarTab === tb.id
                   ? "text-amber-400 border-amber-400"
                   : "text-stone-500 border-transparent hover:text-stone-300"
               }`}
             >
-              <span className="text-base">{t.icon}</span>
-              {t.label}
+              <span className="text-base">{tb.icon}</span>
+              {tb.label}
             </button>
           ))}
         </div>
 
         {/* Tab content */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: "thin", scrollbarColor: "#44403c transparent" }}>
-
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden r3d-scroll">
           {/* ── ROOM TAB ── */}
           {sidebarTab === "room" && (
-            <div className="p-4">
-              <p className="text-[9px] font-bold tracking-[.14em] uppercase text-stone-500 mb-3 flex items-center gap-2">
+            <div className={dense ? "p-4" : "p-5"}>
+              <p className={`${secLabel} font-bold tracking-[.14em] uppercase text-stone-500 mb-3 flex items-center gap-2`}>
                 Kích Thước Phòng <span className="flex-1 h-px bg-amber-900/30" />
               </p>
               <Slider label="Chiều rộng" value={width}  min={2} max={15} step={0.5} onChange={setWidth} />
@@ -823,18 +1003,18 @@ export default function RoomPlanner() {
                   ].map((d) => (
                     <div key={d.lbl} className="text-center rounded bg-white/[.03] border border-amber-900/20 py-1.5">
                       <div className="text-base font-bold text-white leading-none">{d.val}</div>
-                      <div className="text-[9.5px] text-stone-500 mt-1">{d.lbl}</div>
+                      <div className={`${micro} text-stone-500 mt-1`}>{d.lbl}</div>
                     </div>
                   ))}
                 </div>
                 <div className="flex justify-around pt-2 border-t border-amber-900/20">
                   <div className="text-center">
                     <div className="text-sm font-bold text-amber-400">{(width * length).toFixed(1)}</div>
-                    <div className="text-[9px] text-stone-500">m² sàn</div>
+                    <div className={`${micro} text-stone-500`}>m² sàn</div>
                   </div>
                   <div className="text-center">
                     <div className="text-sm font-bold text-amber-400">{(width * length * height).toFixed(1)}</div>
-                    <div className="text-[9px] text-stone-500">m³ thể tích</div>
+                    <div className={`${micro} text-stone-500`}>m³ thể tích</div>
                   </div>
                 </div>
               </div>
@@ -846,142 +1026,337 @@ export default function RoomPlanner() {
             const selObj = objects.find((o) => o.id === selectedObject);
             const isLocked = selObj?.locked ?? false;
             return (
-            <div className="p-4">
-              <p className="text-[9px] font-bold tracking-[.14em] uppercase text-stone-500 mb-3 flex items-center gap-2">
-                Chỉnh Sửa Đối Tượng <span className="flex-1 h-px bg-amber-900/30" />
-              </p>
+              <div className={dense ? "p-4" : "p-5"}>
+                <p className={`${secLabel} font-bold tracking-[.14em] uppercase text-stone-500 mb-3 flex items-center gap-2`}>
+                  Chỉnh Sửa Đối Tượng <span className="flex-1 h-px bg-amber-900/30" />
+                </p>
 
-              {selObj && (
-                <div className="mb-3 p-3 rounded-lg border border-amber-900/30 bg-stone-900/40 text-xs text-stone-300">
-                  <div className="font-semibold text-amber-400 mb-1.5 truncate">{selObj.name}</div>
-                  <div className="grid grid-cols-3 gap-1 text-[11px] text-stone-400">
-                    <div>Rộng: <strong className="text-white">{selObj.width || 80}cm</strong></div>
-                    <div>Cao: <strong className="text-white">{selObj.height || 75}cm</strong></div>
-                    <div>Dài: <strong className="text-white">{selObj.length || 120}cm</strong></div>
+                {selObj && (
+                  <div className={`mb-3 p-3 rounded-lg border border-amber-900/30 bg-stone-900/40 ${body} text-stone-300`}>
+                    <div className="font-semibold text-amber-400 mb-1.5 truncate">{selObj.name}</div>
+                    <div className={`grid grid-cols-3 gap-1 ${micro} text-stone-400`}>
+                      <div>Rộng: <strong className="text-white">{selObj.width || 80}cm</strong></div>
+                      <div>Cao: <strong className="text-white">{selObj.height || 75}cm</strong></div>
+                      <div>Dài: <strong className="text-white">{selObj.length || 120}cm</strong></div>
+                    </div>
                   </div>
+                )}
+
+                <button
+                  onClick={toggleLock}
+                  disabled={!selectedObject}
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 ${tap} rounded-lg border ${body} font-semibold mb-3 transition-all disabled:opacity-30 disabled:cursor-not-allowed`}
+                  style={
+                    isLocked
+                      ? { background: "rgba(212,168,83,.18)", borderColor: "rgba(212,168,83,.55)", color: "#f5c842", boxShadow: "0 0 10px rgba(212,168,83,.15)" }
+                      : { background: "rgba(255,255,255,.03)", borderColor: "rgba(255,255,255,.12)", color: "#a8a29e" }
+                  }
+                >
+                  <span className="text-base">{isLocked ? "🔒" : "🔓"}</span>
+                  {isLocked ? "Đã khoá vị trí · mở khoá" : "Khoá vị trí"}
+                </button>
+
+                {isLocked && (
+                  <div className={`mb-3 p-2.5 rounded-lg border border-amber-400/25 ${micro} text-amber-300/70 text-center leading-relaxed`}
+                       style={{ background: "rgba(212,168,83,.07)" }}>
+                    🔒 Đối tượng đang bị khoá<br />
+                    <span className="text-stone-500">Mở khoá để di chuyển / xoay / scale</span>
+                  </div>
+                )}
+
+                <div className={"grid grid-cols-3 gap-1.5 mb-3 transition-opacity" + (isLocked ? " opacity-30 pointer-events-none" : "")}>
+                  {tools.map((t) => (
+                    <button
+                      key={t.mode}
+                      onClick={() => setTransformMode(t.mode)}
+                      className={`flex flex-col items-center gap-1 py-2.5 ${tap} rounded-lg border ${dense ? "text-[10px]" : "text-xs"} font-medium transition-all ` + (
+                        transformMode === t.mode
+                          ? "border-amber-400 text-amber-400"
+                          : "border-amber-900/25 text-stone-400 hover:border-amber-700/50 hover:text-stone-200"
+                      )}
+                      style={
+                        transformMode === t.mode
+                          ? { background: "linear-gradient(135deg,rgba(212,168,83,.22),rgba(201,107,58,.14))", boxShadow: "0 0 10px rgba(212,168,83,.15)" }
+                          : { background: "rgba(255,255,255,.02)" }
+                      }
+                    >
+                      <span className="text-lg">{t.icon}</span>
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
-              )}
 
-              {/* Lock / Unlock button */}
-              <button
-                onClick={toggleLock}
-                disabled={!selectedObject}
-                className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border text-xs font-semibold mb-3 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                style={
-                  isLocked
-                    ? { background: "rgba(212,168,83,.18)", borderColor: "rgba(212,168,83,.55)", color: "#f5c842", boxShadow: "0 0 10px rgba(212,168,83,.15)" }
-                    : { background: "rgba(255,255,255,.03)", borderColor: "rgba(255,255,255,.12)", color: "#a8a29e" }
-                }
-              >
-                <span className="text-base">{isLocked ? "🔒" : "🔓"}</span>
-                {isLocked ? "Đã khoá vị trí · Click để mở" : "Khoá vị trí"}
-              </button>
-
-              {/* Locked notice */}
-              {isLocked && (
-                <div className="mb-3 p-2.5 rounded-lg border border-amber-400/25 text-[11px] text-amber-300/70 text-center leading-relaxed"
-                     style={{ background: "rgba(212,168,83,.07)" }}>
-                  🔒 Đối tượng đang bị khoá<br />
-                  <span className="text-stone-500">Mở khoá để di chuyển / xoay / scale</span>
-                </div>
-              )}
-
-              {/* Transform mode buttons — disabled when locked */}
-              <div className={"grid grid-cols-3 gap-1.5 mb-3 transition-opacity" + (isLocked ? " opacity-30 pointer-events-none" : "")}>
-                {tools.map((t) => (
+                <div className="grid grid-cols-2 gap-1.5">
                   <button
-                    key={t.mode}
-                    onClick={() => setTransformMode(t.mode)}
-                    className={"flex flex-col items-center gap-1 py-2.5 rounded-lg border text-[10px] font-medium transition-all " + (
-                      transformMode === t.mode
-                        ? "border-amber-400 text-amber-400"
-                        : "border-amber-900/25 text-stone-400 hover:border-amber-700/50 hover:text-stone-200"
-                    )}
-                    style={
-                      transformMode === t.mode
-                        ? { background: "linear-gradient(135deg,rgba(212,168,83,.22),rgba(201,107,58,.14))", boxShadow: "0 0 10px rgba(212,168,83,.15)" }
-                        : { background: "rgba(255,255,255,.02)" }
-                    }
+                    onClick={duplicateSelected}
+                    disabled={!selectedObject}
+                    className={`flex items-center justify-center gap-1.5 py-2.5 ${tap} rounded-lg border ${body} font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed`}
+                    style={{ background: "rgba(122,158,126,.1)", borderColor: "rgba(122,158,126,.3)", color: "#9dc5a0" }}
                   >
-                    <span className="text-lg">{t.icon}</span>
-                    {t.label}
+                    ⧉ Nhân đôi
                   </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  onClick={duplicateSelected}
-                  disabled={!selectedObject}
-                  className="flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{ background: "rgba(122,158,126,.1)", borderColor: "rgba(122,158,126,.3)", color: "#9dc5a0" }}
-                >
-                  ⧉ Nhân đôi
-                </button>
-                <button
-                  onClick={deleteSelected}
-                  disabled={!selectedObject}
-                  className="flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{ background: "rgba(201,107,58,.1)", borderColor: "rgba(201,107,58,.3)", color: "#e09070" }}
-                >
-                  🗑️ Xóa
-                </button>
-              </div>
-
-              {!selectedObject && (
-                <div className="mt-3 p-2.5 rounded-lg border border-amber-900/20 bg-white/[.02] text-[11px] text-stone-500 text-center leading-relaxed">
-                  Click vào đối tượng 3D<br />để chọn và chỉnh sửa
+                  <button
+                    onClick={deleteSelected}
+                    disabled={!selectedObject}
+                    className={`flex items-center justify-center gap-1.5 py-2.5 ${tap} rounded-lg border ${body} font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed`}
+                    style={{ background: "rgba(201,107,58,.1)", borderColor: "rgba(201,107,58,.3)", color: "#e09070" }}
+                  >
+                    🗑️ Xóa
+                  </button>
                 </div>
-              )}
-            </div>
+
+                {!selectedObject && (
+                  <div className={`mt-3 p-2.5 rounded-lg border border-amber-900/20 bg-white/[.02] ${micro} text-stone-500 text-center leading-relaxed`}>
+                    Chạm vào đối tượng 3D<br />để chọn và chỉnh sửa
+                  </div>
+                )}
+              </div>
             );
           })()}
 
           {/* ── OBJECTS TAB ── */}
           {sidebarTab === "objects" && (
-            <div className="p-3">
+            <div className={dense ? "p-3" : "p-4"}>
               {objects.length === 0 ? (
-                <div className="text-center py-7 text-stone-500 text-xs leading-loose">
+                <div className={`text-center py-7 text-stone-500 ${body} leading-loose`}>
                   <div className="text-3xl mb-2 opacity-40">🪑</div>
                   <div>Chưa có nội thất nào</div>
-                  <div className="text-[11px] mt-1">Chọn sản phẩm từ bảng bên dưới</div>
+                  <div className={`${micro} mt-1`}>Thêm sản phẩm từ mục Nội thất</div>
                 </div>
               ) : (
                 objects.map((obj, index) => (
                   <div
                     key={obj.id}
                     onClick={() => setSelectedObject(selectedObject === obj.id ? null : obj.id)}
-                    className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg border mb-1 cursor-pointer transition-all ${
+                    className={`flex items-center gap-2.5 px-2.5 ${dense ? "py-2" : "py-3"} rounded-lg border mb-1 cursor-pointer transition-all ${
                       selectedObject === obj.id
                         ? "border-amber-400/40 bg-amber-400/10"
                         : "border-transparent hover:border-amber-900/30 hover:bg-white/[.02]"
                     }`}
                   >
                     <div
-                      className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      className={`w-6 h-6 rounded flex items-center justify-center text-[11px] font-bold shrink-0 ${
                         selectedObject === obj.id ? "text-stone-950" : "text-stone-500"
                       }`}
-                      style={
-                        selectedObject === obj.id
-                          ? { background: "#d4a853" }
-                          : { background: "#292524" }
-                      }
+                      style={selectedObject === obj.id ? { background: "#d4a853" } : { background: "#292524" }}
                     >
                       {index + 1}
                     </div>
-                    <span className={"text-xs flex-1 " + (selectedObject === obj.id ? "text-white" : "text-stone-400")}>
+                    <span className={`${body} flex-1 truncate ` + (selectedObject === obj.id ? "text-white" : "text-stone-400")}>
                       {obj.name}
                     </span>
-                    {obj.locked && (
-                      <span className="text-[11px] shrink-0" title="Đã khoá">🔒</span>
-                    )}
+                    {obj.locked && <span className="text-[13px] shrink-0" title="Đã khoá">🔒</span>}
                   </div>
                 ))
               )}
             </div>
           )}
         </div>
-      </aside>
+      </>
+    );
+  };
+
+  /* ── Product catalog. Desktop/tablet → horizontal scroll bar; mobile sheet →
+        2-column grid (no horizontal scroll, larger tap targets). ── */
+  const catalogPanel = (dense) => (
+    <div className="flex flex-col min-h-0 h-full overflow-hidden">
+      {/* Category tabs */}
+      <div className="flex items-center border-b border-amber-900/30 shrink-0 px-1 min-h-[42px] overflow-x-auto r3d-scroll">
+        {loading ? (
+          <div className="px-4 py-2 text-sm text-stone-500 flex items-center gap-2">
+            <span className="animate-spin text-amber-500 text-sm">⌛</span> Đang tải danh mục...
+          </div>
+        ) : (
+          categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat)}
+              className={`flex items-center gap-1.5 px-4 ${dense ? "py-2.5" : "py-3 min-h-[44px]"} text-sm font-medium border-b-2 -mb-px transition-all shrink-0 whitespace-nowrap ${
+                selectedCategory?.id === cat.id
+                  ? "text-amber-400 border-amber-400"
+                  : "text-stone-500 border-transparent hover:text-stone-300"
+              }`}
+            >
+              {cat.icon} {cat.name}
+            </button>
+          ))
+        )}
+        {dense && (
+          <>
+            <div className="flex-1" />
+            <span className="pr-3 text-[10.5px] text-stone-600 shrink-0 whitespace-nowrap">Click sản phẩm để thêm vào phòng</span>
+          </>
+        )}
+      </div>
+
+      {/* Product cards */}
+      <div
+        className={
+          dense
+            ? "flex-1 flex gap-2.5 px-3.5 py-2.5 overflow-x-auto items-center r3d-scroll"
+            : "flex-1 min-h-0 grid grid-cols-2 gap-3 px-4 py-4 overflow-y-auto r3d-scroll content-start"
+        }
+      >
+        {loading ? (
+          (dense ? [1, 2, 3] : [1, 2, 3, 4]).map((n) => (
+            <div key={n} className={`${dense ? "shrink-0 w-32 h-24" : "h-28"} rounded-xl border border-amber-900/10 p-2.5 animate-pulse bg-stone-900/30 flex flex-col justify-between`}>
+              <div className="h-14 rounded-lg bg-stone-800/40" />
+              <div className="h-3 rounded bg-stone-800 w-3/4" />
+            </div>
+          ))
+        ) : selectedCategory?.products && selectedCategory.products.length > 0 ? (
+          selectedCategory.products.map((product) => (
+            <div
+              key={product.id}
+              onClick={() => {
+                addProduct(product);
+                if (isMobile) setCatalogOpen(false);
+              }}
+              className={`${dense ? "shrink-0 w-32" : "w-full"} rounded-xl border border-amber-900/25 p-2.5 cursor-pointer transition-all hover:-translate-y-1 hover:border-amber-600/50 hover:shadow-xl active:scale-[.98] relative overflow-hidden group`}
+              style={{ background: "linear-gradient(160deg,rgba(74,62,48,.4),rgba(26,20,16,.8))" }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-400/[.07] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="h-14 rounded-lg border border-amber-900/25 flex items-center justify-center text-2xl mb-2 relative"
+                   style={{ background: "linear-gradient(135deg,rgba(74,62,48,.4),rgba(26,20,16,.7))" }}>
+                🪑
+                <span className="absolute bottom-1 right-1 text-[8px] font-bold text-amber-400 bg-amber-400/10 px-1 rounded">3D</span>
+              </div>
+              <div className="text-[13px] font-semibold text-white truncate" title={product.name}>{product.name}</div>
+              <div className="text-[11px] text-stone-500 mt-0.5">+ Thêm vào phòng</div>
+            </div>
+          ))
+        ) : (
+          <div className="text-stone-500 text-sm px-2.5 py-4">Không có sản phẩm nào</div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Mobile bottom navigation → opens the control drawer (per tab) or catalog sheet.
+  const bottomNav = (
+    <nav
+      style={{ gridArea: "bottom", paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="flex items-stretch border-t border-amber-900/30 bg-stone-950/98 z-30"
+    >
+      {[
+        { id: "room",    icon: "📐", label: "Phòng",   onClick: () => openPanel("room") },
+        { id: "tools",   icon: "🎮", label: "Công cụ", onClick: () => openPanel("tools") },
+        { id: "objects", icon: "📦", label: "Vật thể", onClick: () => openPanel("objects"), badge: objects.length },
+        { id: "catalog", icon: "🛋️", label: "Nội thất", onClick: () => setCatalogOpen(true), primary: true },
+      ].map((item) => (
+        <button
+          key={item.id}
+          onClick={item.onClick}
+          className={`flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[44px] text-[11px] font-medium transition-colors ${
+            item.primary ? "text-amber-400" : "text-stone-400 active:text-amber-300"
+          }`}
+        >
+          <span className="relative text-xl leading-none">
+            {item.icon}
+            {item.badge ? (
+              <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-stone-950 text-[9px] font-bold flex items-center justify-center">
+                {item.badge}
+              </span>
+            ) : null}
+          </span>
+          {item.label}
+        </button>
+      ))}
+    </nav>
+  );
+
+  // Initial camera frame — r3f reads the `camera` prop once on mount; the
+  // CameraController then refines it on every viewMode / room-size change.
+  const initialCam =
+    viewMode === "interior"
+      ? fitInteriorCamera(width, length, height)
+      : fitExteriorCamera(width, length, height);
+
+  return (
+    <div
+      className="h-screen overflow-hidden text-white"
+      style={{
+        height: "100dvh",
+        display: "grid",
+        ...layoutStyle,
+        background: "#1a1410",
+        fontFamily: "'DM Sans', sans-serif",
+      }}
+    >
+      {/* ── TOPBAR (sticky — never scrolls; lives in its own grid row) ── */}
+      <header
+        style={{ gridArea: "topbar", paddingTop: isMobile ? "env(safe-area-inset-top)" : undefined }}
+        className="flex items-center justify-between gap-2 px-3 sm:px-5 border-b border-amber-900/30 bg-stone-950/95 z-30"
+      >
+        {/* Brand + hamburger */}
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+          {isMobile && (
+            <button
+              onClick={() => openPanel(sidebarTab)}
+              className="w-11 h-11 -ml-2 flex items-center justify-center rounded-lg text-amber-300 text-xl leading-none shrink-0"
+              aria-label="Mở bảng điều khiển"
+            >
+              ☰
+            </button>
+          )}
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0"
+               style={{ background: "linear-gradient(135deg,#d4a853,#c96b3a)", boxShadow: "0 0 14px rgba(212,168,83,.35)" }}>
+            🏠
+          </div>
+          <span className="font-bold text-base tracking-tight truncate">
+            Room<span className="text-amber-400 italic">3D</span>
+          </span>
+        </div>
+
+        {/* View toggle */}
+        <div className="flex bg-stone-900/80 border border-amber-900/30 rounded-lg p-1 gap-1 shrink-0">
+          {[
+            { id: "exterior", icon: "🌐", label: "Tổng quan" },
+            { id: "interior", icon: "🏠", label: "Bên trong" },
+          ].map((v) => (
+            <button
+              key={v.id}
+              onClick={() => setViewMode(v.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                viewMode === v.id
+                  ? "text-stone-950 font-semibold shadow"
+                  : "text-stone-400 hover:text-stone-200"
+              }`}
+              style={
+                viewMode === v.id
+                  ? { background: "linear-gradient(135deg,#d4a853,#c96b3a)", boxShadow: "0 2px 8px rgba(212,168,83,.3)" }
+                  : {}
+              }
+            >
+              <span>{v.icon}</span>
+              <span className="hidden sm:inline">{v.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Stats — desktop only (tablet/mobile hide to give the toggle room) */}
+        <div className="hidden lg:flex items-center gap-2">
+          {[
+            { label: "Diện tích", value: `${(width * length).toFixed(1)} m²` },
+            { label: "Thể tích",  value: `${(width * length * height).toFixed(1)} m³` },
+            { label: "Nội thất",  value: `${objects.length} vật` },
+          ].map((s) => (
+            <div key={s.label} className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber-900/30 bg-stone-900/60 text-xs text-stone-400">
+              {s.label} <strong className="text-amber-400 font-semibold">{s.value}</strong>
+            </div>
+          ))}
+        </div>
+      </header>
+
+      {/* ── SIDEBAR (tablet / desktop) — same control panel as the mobile drawer ── */}
+      {!isMobile && (
+        <aside
+          style={{ gridArea: "sidebar" }}
+          className="flex flex-col border-r border-amber-900/30 bg-stone-950/95 overflow-hidden"
+        >
+          {controlPanel(true)}
+        </aside>
+      )}
 
       {/* ── CANVAS ── */}
       <div style={{ gridArea: "canvas" }} className="relative overflow-hidden">
@@ -991,8 +1366,8 @@ export default function RoomPlanner() {
           {viewMode === "exterior" ? "🌐 Góc nhìn tổng quan" : "🏠 Góc nhìn bên trong"}
         </div>
 
-        {/* Hints */}
-        <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5 pointer-events-none">
+        {/* Hints — hidden on mobile (they describe mouse-only interactions) */}
+        <div className={"absolute top-3 right-3 z-10 flex-col gap-1.5 pointer-events-none " + (isMobile ? "hidden" : "flex")}>
           {["Chuột phải: xoay góc nhìn", "Scroll: thu phóng", "Giữa chuột: di chuyển"].map((hint) => (
             <div key={hint} className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber-900/25 bg-stone-950/85 text-[10.5px] text-stone-400"
                  style={{ backdropFilter: "blur(8px)" }}>
@@ -1002,24 +1377,31 @@ export default function RoomPlanner() {
           ))}
         </div>
 
-        {/* Selected indicator */}
+        {/* Selected indicator — on mobile it's a shortcut into the Tools panel */}
         {selectedObject && (() => {
           const selObj = objects.find((o) => o.id === selectedObject);
-          return (
-          <div className={"absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-1.5 rounded-full border bg-stone-950/90 text-[11.5px] font-medium pointer-events-none whitespace-nowrap " + (selObj?.locked ? "border-amber-400/60 text-amber-300" : "border-amber-400/35 text-amber-400")}
-               style={{ backdropFilter: "blur(8px)", boxShadow: "0 0 16px rgba(212,168,83,.12)" }}>
-            {selObj?.locked ? "🔒 Đã khoá · vào tab Công Cụ để mở khoá" : "✦ Đã chọn · dùng tab Công Cụ để chỉnh sửa"}
-          </div>
+          const cls =
+            "absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full border bg-stone-950/90 text-[12px] font-medium whitespace-nowrap " +
+            (selObj?.locked ? "border-amber-400/60 text-amber-300 " : "border-amber-400/35 text-amber-400 ") +
+            (isMobile ? "pointer-events-auto active:scale-95 transition-transform" : "pointer-events-none");
+          const style = { backdropFilter: "blur(8px)", boxShadow: "0 0 16px rgba(212,168,83,.12)" };
+          const label = isMobile
+            ? (selObj?.locked ? "🔒 Đã khoá · chạm để mở khoá" : "✦ Đã chọn · chạm để chỉnh sửa")
+            : (selObj?.locked ? "🔒 Đã khoá · vào tab Công Cụ để mở khoá" : "✦ Đã chọn · dùng tab Công Cụ để chỉnh sửa");
+          return isMobile ? (
+            <button className={cls} style={style} onClick={() => openPanel("tools")}>{label}</button>
+          ) : (
+            <div className={cls} style={style}>{label}</div>
           );
         })()}
 
         <Canvas
           shadows
           camera={{
-            position: viewMode === "interior" ? [0, height * 0.5, length * 0.3] : [width * 1.2, height * 1.1, length * 1.2],
-            fov: viewMode === "interior" ? 80 : 50,
-            near: 0.01,
-            far: 200,
+            position: initialCam.position,
+            fov: initialCam.fov,
+            near: 0.1,
+            far: 100,
           }}
           onPointerMissed={() => setSelectedObject(null)}
           style={{ width: "100%", height: "100%", background: "radial-gradient(ellipse at 40% 30%,#1a1208 0%,#0a0806 100%)" }}
@@ -1079,75 +1461,31 @@ export default function RoomPlanner() {
             dampingFactor={0.05}
             minDistance={0.5}
             maxDistance={50}
-            target={viewMode === "interior" ? [0, height * 0.4, -length * 0.1] : [0, height / 3, 0]}
+            target={initialCam.target}
           />
         </Canvas>
       </div>
 
-      {/* ── BOTTOM PANEL ── */}
-      <div style={{ gridArea: "bottom" }} className="flex flex-col border-t border-amber-900/30 bg-stone-950/98 overflow-hidden">
-        {/* Category tabs */}
-        <div className="flex items-center border-b border-amber-900/30 shrink-0 px-1 min-h-[38px]">
-          {loading ? (
-            <div className="px-4 py-2 text-xs text-stone-500 flex items-center gap-2">
-              <span className="animate-spin text-amber-500 text-sm">⌛</span> Đang tải danh mục...
-            </div>
-          ) : (
-            categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 -mb-px transition-all ${
-                  selectedCategory?.id === cat.id
-                    ? "text-amber-400 border-amber-400"
-                    : "text-stone-500 border-transparent hover:text-stone-300"
-                }`}
-              >
-                {cat.icon} {cat.name}
-              </button>
-            ))
-          )}
-          <div className="flex-1" />
-          {!loading && <span className="pr-3 text-[10.5px] text-stone-600">Click sản phẩm để thêm vào phòng</span>}
+      {/* ── BOTTOM: catalog bar (tablet/desktop) · bottom-nav (mobile) ── */}
+      {isMobile ? (
+        bottomNav
+      ) : (
+        <div style={{ gridArea: "bottom" }} className="overflow-hidden border-t border-amber-900/30 bg-stone-950/98">
+          {catalogPanel(true)}
         </div>
+      )}
 
-        {/* Product cards */}
-        <div className="flex-1 flex gap-2.5 px-3.5 py-2.5 overflow-x-auto items-center" style={{ scrollbarWidth: "thin", scrollbarColor: "#44403c transparent" }}>
-          {loading ? (
-            <div className="flex gap-2.5 w-full">
-              {[1, 2, 3].map((n) => (
-                <div
-                  key={n}
-                  className="shrink-0 w-32 h-24 rounded-xl border border-amber-900/10 p-2.5 animate-pulse bg-stone-900/30 flex flex-col justify-between"
-                >
-                  <div className="h-14 rounded-lg bg-stone-850/40" />
-                  <div className="h-3 rounded bg-stone-800 w-3/4" />
-                </div>
-              ))}
-            </div>
-          ) : selectedCategory?.products && selectedCategory.products.length > 0 ? (
-            selectedCategory.products.map((product) => (
-              <div
-                key={product.id}
-                onClick={() => addProduct(product)}
-                className="shrink-0 w-32 rounded-xl border border-amber-900/25 p-2.5 cursor-pointer transition-all hover:-translate-y-1 hover:border-amber-600/50 hover:shadow-xl relative overflow-hidden group"
-                style={{ background: "linear-gradient(160deg,rgba(74,62,48,.4),rgba(26,20,16,.8))" }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-400/[.07] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="h-14 rounded-lg border border-amber-900/25 flex items-center justify-center text-2xl mb-2 relative"
-                     style={{ background: "linear-gradient(135deg,rgba(74,62,48,.4),rgba(26,20,16,.7))" }}>
-                  🪑
-                  <span className="absolute bottom-1 right-1 text-[8px] font-bold text-amber-400 bg-amber-400/10 px-1 rounded">3D</span>
-                </div>
-                <div className="text-[11.5px] font-semibold text-white truncate" title={product.name}>{product.name}</div>
-                <div className="text-[10px] text-stone-500 mt-0.5">+ Thêm vào phòng</div>
-              </div>
-            ))
-          ) : (
-            <div className="text-stone-500 text-xs px-2.5">Không có sản phẩm nào</div>
-          )}
-        </div>
-      </div>
+      {/* ── MOBILE OVERLAYS: control drawer + catalog sheet ── */}
+      {isMobile && (
+        <>
+          <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Bảng điều khiển">
+            {controlPanel(false)}
+          </Drawer>
+          <BottomSheet open={catalogOpen} onClose={() => setCatalogOpen(false)} title="Thêm nội thất">
+            {catalogPanel(false)}
+          </BottomSheet>
+        </>
+      )}
     </div>
   );
 }

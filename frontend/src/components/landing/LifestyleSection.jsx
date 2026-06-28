@@ -75,7 +75,7 @@ export default function LifestyleSection() {
           </h2>
 
           {/* Paragraph */}
-          <p className="text-white/50 font-light leading-relaxed mb-8 max-w-md text-sm sm:text-base tracking-wide">
+          <p className="text-white/75 font-normal leading-relaxed mb-8 max-w-md text-sm sm:text-base tracking-wide">
             Chúng tôi tin rằng nội thất không chỉ là đồ vật — đó là nghệ thuật
             kiến tạo không gian sống. Mỗi sản phẩm được chọn lọc kỹ lưỡng, từ
             chất liệu đến đường nét, để mang đến sự hoàn hảo trong từng chi
@@ -93,7 +93,7 @@ export default function LifestyleSection() {
                 <p className="text-champagne text-2xl sm:text-3xl font-extrabold tracking-tight">
                   {stat.number}
                 </p>
-                <p className="text-white/35 text-[10px] sm:text-xs font-light tracking-wide mt-1 uppercase">
+                <p className="text-white/55 text-[10px] sm:text-xs font-normal tracking-wide mt-1 uppercase">
                   {stat.label}
                 </p>
               </div>

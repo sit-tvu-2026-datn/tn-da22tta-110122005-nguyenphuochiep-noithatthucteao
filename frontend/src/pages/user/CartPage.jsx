@@ -257,7 +257,7 @@ export default function CartPage() {
 
   if (!cartOrders.length) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center bg-gray-50 p-4">
+      <div className="min-h-[60vh] flex flex-col items-center justify-center bg-gray-50 p-4 font-sans">
         <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md w-full">
           <img
             src={nothingImg}
@@ -291,7 +291,7 @@ export default function CartPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8 font-sans">
       {contextHolder}
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-extrabold text-gray-900 mb-8 flex items-center gap-3">

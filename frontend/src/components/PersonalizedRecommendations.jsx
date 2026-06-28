@@ -155,7 +155,7 @@ export default function PersonalizedRecommendations() {
               </>
             )}
           </p>
-          <h2 className="mt-3 text-3xl font-light tracking-[-0.02em] text-[#20201d] md:text-5xl">
+          <h2 className="mt-3 text-3xl font-normal tracking-[-0.02em] text-[#20201d] md:text-5xl">
             Gợi ý dành cho bạn
           </h2>          
         </div>        
@@ -200,7 +200,7 @@ export default function PersonalizedRecommendations() {
               </Link>
               <div className="p-5">
                 <Link to={`/product/${product.productId}`} className="block">
-                  <h3 className="min-h-12 text-lg font-light leading-snug text-[#25231f] transition group-hover:text-[#8a6d3b] line-clamp-2">
+                  <h3 className="min-h-12 text-lg font-normal leading-snug text-[#25231f] transition group-hover:text-[#8a6d3b] line-clamp-2">
                     {product.productName}
                   </h3>
                 </Link>

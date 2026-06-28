@@ -85,3 +85,66 @@ body {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* ============================================
+   ROOM3D — Responsive helpers
+   ============================================ */
+
+/* Thin, theme-tinted scrollbars for the planner panels (Firefox + WebKit). */
+.r3d-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #44403c transparent;
+}
+.r3d-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.r3d-scroll::-webkit-scrollbar-thumb {
+  background: #44403c;
+  border-radius: 9999px;
+}
+.r3d-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Range input — visible track + a thumb that grows to a comfortable touch
+   target on coarse (touch) pointers. */
+input[type="range"].r3d-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  outline: none;
+}
+input[type="range"].r3d-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f59e0b;
+  border: 2px solid #1c1917;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+input[type="range"].r3d-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #1c1917;
+  border-radius: 50%;
+  background: #f59e0b;
+  cursor: pointer;
+}
+@media (pointer: coarse) {
+  input[type="range"].r3d-range {
+    height: 8px;
+  }
+  input[type="range"].r3d-range::-webkit-slider-thumb {
+    width: 26px;
+    height: 26px;
+  }
+  input[type="range"].r3d-range::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+  }
+}

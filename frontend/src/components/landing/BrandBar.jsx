@@ -61,7 +61,7 @@ export default function BrandBar() {
                 <h3 className="text-white text-xs sm:text-sm font-semibold tracking-wide uppercase">
                   {item.title}
                 </h3>
-                <p className="text-white/35 text-[10px] sm:text-xs font-light mt-0.5 tracking-wide">
+                <p className="text-white/60 text-[10px] sm:text-xs font-normal mt-0.5 tracking-wide">
                   {item.desc}
                 </p>
               </div>

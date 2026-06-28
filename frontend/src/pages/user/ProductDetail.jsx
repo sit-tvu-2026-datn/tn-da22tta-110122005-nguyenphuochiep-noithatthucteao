@@ -23,7 +23,6 @@ import Cookies from "js-cookie";
 import { CartContext } from "../../context/CartContext";
 import "@google/model-viewer";
 import api from "../../config/api";
-import SimilarProducts from "../../components/SimilarProducts";
 import RecommendationCarousel from "../../components/recommend/RecommendationCarousel";
 
 
@@ -111,7 +110,7 @@ const MATERIAL_OPTIONS = ["Vải bouclé Ý", "Da aniline", "Linen Bỉ", "Gỗ 
 
 const TAB_KEYS = [
   { key: "description", label: "Mô tả sản phẩm" },
-  { key: "specifications", label: "Thông số kỹ thuật" },
+  { key: "specifications", label: "Thông số sản phẩm" },
   { key: "reviews", label: "Đánh giá" },
 ];
 
@@ -155,7 +154,7 @@ function getProductPriceInfo(product, flashSale) {
 
 function ProductDetailSkeleton() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-ivory via-white to-whisper/40 px-5 py-10 font-montserrat">
+    <main className="min-h-screen bg-gradient-to-b from-ivory via-white to-whisper/40 px-5 py-10 font-roboto">
       <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="aspect-[4/5] animate-pulse rounded-[2rem] bg-whisper/60" />
         <div className="space-y-6 pt-8">
@@ -253,7 +252,7 @@ function QuantitySelector({ value, max, allowPreorder, onChange }) {
         value={value}
         onChange={(event) => onChange(normalizeQuantity(event.target.value))}
         onBlur={(event) => onChange(normalizeQuantity(event.target.value))}
-        className="h-full w-16 border-x border-[#e1d8ca] bg-transparent text-center text-sm font-semibold text-[#232320] outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="h-full w-16 border-x border-[#e1d8ca] bg-transparent text-center text-sm font-normal text-[#232320] outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         aria-label="Nhập số lượng"
       />
       <button
@@ -380,12 +379,12 @@ function ProductGallery({
           <div className="relative aspect-[4/5] min-h-[440px]">
             <div className="absolute left-5 top-5 z-20 flex gap-2">
               {discountPercent > 0 && !isOutOfStock && (
-                <span className="rounded-full bg-[#26231f]/90 px-4 py-2 text-xs font-medium uppercase tracking-[0.24em] text-[#f8f6f2] backdrop-blur">
+                <span className="rounded-full bg-[#26231f]/90 px-4 py-2 text-xs font-normal uppercase tracking-[0.24em] text-[#f8f6f2] backdrop-blur">
                   -{discountPercent}%
                 </span>
               )}
               {isOutOfStock && (
-                <span className="rounded-full bg-white/90 px-4 py-2 text-xs font-medium uppercase tracking-[0.24em] text-[#26231f]">
+                <span className="rounded-full bg-white/90 px-4 py-2 text-xs font-normal uppercase tracking-[0.24em] text-[#26231f]">
                   Hết hàng
                 </span>
               )}
@@ -420,7 +419,7 @@ function ProductGallery({
                   >
                     <button
                       slot="ar-button"
-                      className="absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full bg-[#1f1f1d] px-6 py-3 text-sm font-medium text-[#f8f6f2] shadow-[0_18px_45px_rgba(0,0,0,0.28)]"
+                      className="absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full bg-[#1f1f1d] px-6 py-3 text-sm font-normal text-[#f8f6f2] shadow-[0_18px_45px_rgba(0,0,0,0.28)]"
                     >
                       Ướm thử trong không gian
                     </button>
@@ -490,7 +489,7 @@ function ProductInfo({
   return (
     <motion.aside variants={stagger} initial="hidden" animate="show" className="flex flex-col">
       <motion.div variants={fadeUp} className="mb-5 flex items-center justify-between gap-4">
-        <span className="text-xs font-semibold uppercase tracking-[0.32em] text-[#9a7d46]">Bộ sưu tập Atelier</span>
+        <span className="text-xs font-normal uppercase tracking-[0.32em] text-[#9a7d46]">Bộ sưu tập Atelier</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -519,7 +518,7 @@ function ProductInfo({
 
       <motion.h1
         variants={fadeUp}
-        className="max-w-2xl text-4xl font-light leading-[1.03] tracking-[-0.02em] text-[#20201d] sm:text-5xl xl:text-6xl"
+        className="max-w-2xl text-4xl font-normal leading-[1.03] tracking-[-0.02em] text-[#20201d] sm:text-5xl xl:text-6xl"
       >
         {product.productName}
       </motion.h1>
@@ -531,7 +530,7 @@ function ProductInfo({
 
       <motion.div variants={fadeUp} className="mt-8 border-y border-[#ded4c5] py-7">
         <div className="flex flex-wrap items-end gap-4">
-          <p className="text-3xl font-light tracking-[-0.02em] text-[#191915] sm:text-4xl">
+          <p className="text-3xl font-normal tracking-[-0.02em] text-[#191915] sm:text-4xl">
             {formatMoney(priceInfo.finalPrice)}
           </p>
           {priceInfo.discountPercent > 0 && (
@@ -546,12 +545,12 @@ function ProductInfo({
       <motion.div variants={fadeUp} className="mt-7 space-y-7">    
         <div className="flex flex-wrap items-center justify-between gap-5">
           <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-[#4c463d]">Số lượng</p>
+            <p className="mb-3 text-xs font-normal uppercase tracking-[0.24em] text-[#4c463d]">Số lượng</p>
             <QuantitySelector value={quantity} max={max} allowPreorder={isOutOfStock} onChange={setQuantity} />
           </div>
           <div className="rounded-3xl border border-[#ded4c5] bg-white/45 px-5 py-4">
             <p className="text-xs uppercase tracking-[0.22em] text-[#86796a]">Tình trạng</p>
-            <p className="mt-1 text-sm font-semibold text-[#26231f]">
+            <p className="mt-1 text-sm font-normal text-[#26231f]">
               {isOutOfStock ? "Tạm hết hàng" : `Còn ${max || product.quantity} sản phẩm`}
             </p>
           </div>
@@ -564,7 +563,7 @@ function ProductInfo({
           whileHover={{ y: -2, boxShadow: "0 22px 60px rgba(31,31,29,0.22)" }}
           whileTap={{ scale: 0.985 }}
           onClick={onAddToCart}
-          className="flex h-14 items-center justify-center gap-3 rounded-full border border-[#24231f] bg-[#24231f] px-6 text-sm font-semibold uppercase tracking-[0.18em] text-[#f8f6f2] transition"
+          className="flex h-14 items-center justify-center gap-3 rounded-full border border-[#24231f] bg-[#24231f] px-6 text-sm font-normal uppercase tracking-[0.18em] text-[#f8f6f2] transition"
         >
           <ShoppingBag size={18} />
           Thêm vào giỏ hàng
@@ -575,7 +574,7 @@ function ProductInfo({
           whileTap={{ scale: 0.985 }}
           onClick={onBuyNow}
           disabled={isOutOfStock}
-          className="flex h-14 items-center justify-center rounded-full border border-[#c4aa75] bg-[#c4aa75] px-6 text-sm font-semibold uppercase tracking-[0.18em] text-[#211f1b] transition disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-14 items-center justify-center rounded-full border border-[#c4aa75] bg-[#c4aa75] px-6 text-sm font-normal uppercase tracking-[0.18em] text-[#211f1b] transition disabled:cursor-not-allowed disabled:opacity-50"
         >
           Mua ngay
         </motion.button>
@@ -659,9 +658,9 @@ function ProductTabs({ product, activeTab, setActiveTab, reviews, averageRating,
           >
             {activeTab === "description" && (
               <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr]">
-                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#9a7d46]">Ghi chú thiết kế</p>
+                <p className="text-xs font-normal uppercase tracking-[0.32em] text-[#9a7d46]">Ghi chú thiết kế</p>
                 <div>
-                  <h2 className="text-3xl font-light leading-tight tracking-[-0.02em] text-[#20201d] md:text-5xl">
+                  <h2 className="text-3xl font-normal leading-tight tracking-[-0.02em] text-[#20201d] md:text-5xl">
                     Tỷ lệ tĩnh tại, chất liệu giàu xúc cảm và dáng hình dành cho nhịp sống chậm.
                   </h2>
                   <p className="mt-6 max-w-3xl text-lg leading-9 text-[#62594f]">
@@ -687,7 +686,7 @@ function ProductTabs({ product, activeTab, setActiveTab, reviews, averageRating,
                 <div className="rounded-[1.75rem] border border-white/70 bg-white/50 p-7">
                   <p className="text-sm uppercase tracking-[0.24em] text-[#8a7f70]">Điểm đánh giá</p>
                   <div className="mt-3 flex items-end gap-3">
-                    <span className="text-5xl font-light text-[#211f1c]">{averageRating.toFixed(1)}</span>
+                    <span className="text-5xl font-normal text-[#211f1c]">{averageRating.toFixed(1)}</span>
                     <StarRating value={averageRating} size={18} />
                   </div>
 
@@ -711,7 +710,7 @@ function ProductTabs({ product, activeTab, setActiveTab, reviews, averageRating,
                           type="button"
                           onClick={onSubmitReview}
                           disabled={submittingReview}
-                          className="flex h-12 w-full items-center justify-center rounded-full bg-[#24231f] text-sm font-semibold uppercase tracking-[0.18em] text-[#f8f6f2] disabled:opacity-60"
+                          className="flex h-12 w-full items-center justify-center rounded-full bg-[#24231f] text-sm font-normal uppercase tracking-[0.18em] text-[#f8f6f2] disabled:opacity-60"
                         >
                           {submittingReview ? <Loader2 className="animate-spin" size={18} /> : "Gửi đánh giá"}
                         </button>
@@ -737,7 +736,7 @@ function ProductTabs({ product, activeTab, setActiveTab, reviews, averageRating,
                       >
                         <div className="flex items-center justify-between gap-4">
                           <div>
-                            <p className="font-medium text-[#25231f]">{review.user?.fullName || review.user?.email || "Khách hàng đã mua"}</p>
+                            <p className="font-normal text-[#25231f]">{review.user?.fullName || review.user?.email || "Khách hàng đã mua"}</p>
                             <p className="text-xs uppercase tracking-[0.2em] text-[#9b9285]">Đơn mua đã xác thực</p>
                           </div>
                           <StarRating value={review.rating} size={15} />
@@ -767,8 +766,8 @@ function RelatedProducts({ products, onAddToCart }) {
     >
       <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#9a7d46]">Hoàn thiện không gian</p>
-          <h2 className="mt-3 text-3xl font-light tracking-[-0.02em] text-[#20201d] md:text-5xl">Sản phẩm liên quan</h2>
+          <p className="text-xs font-normal uppercase tracking-[0.32em] text-[#9a7d46]">Hoàn thiện không gian</p>
+          <h2 className="mt-3 text-3xl font-normal tracking-[-0.02em] text-[#20201d] md:text-5xl">Sản phẩm liên quan</h2>
         </div>
         <Link to="/" className="group inline-flex items-center gap-2 text-sm uppercase tracking-[0.2em] text-[#4b453d]">
           Xem bộ sưu tập
@@ -796,13 +795,13 @@ function RelatedProducts({ products, onAddToCart }) {
               </Link>
               <div className="p-5">
                 <Link to={`/product/${product.productId}`} className="block">
-                  <h3 className="min-h-12 text-lg font-light leading-snug text-[#25231f] transition group-hover:text-[#8a6d3b]">
+                  <h3 className="min-h-12 text-lg font-normal leading-snug text-[#25231f] transition group-hover:text-[#8a6d3b]">
                     {product.productName}
                   </h3>
                 </Link>
                 <div className="mt-4 flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-medium text-[#25231f]">{formatMoney(finalPrice)}</p>
+                    <p className="text-sm font-normal text-[#25231f]">{formatMoney(finalPrice)}</p>
                     {product.discount > 0 && <p className="text-xs text-[#9c9285] line-through">{formatMoney(product.price)}</p>}
                   </div>
                   <button
@@ -833,13 +832,13 @@ function MobilePurchaseBar({ product, price, quantity, setQuantity, max, allowPr
     >
       <div className="mx-auto flex max-w-xl items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-[#25231f]">{product.productName}</p>
+          <p className="truncate text-sm font-normal text-[#25231f]">{product.productName}</p>
           <p className="text-sm text-[#8a6d3b]">{formatMoney(price)}</p>
         </div>
         <div className="scale-90">
           <QuantitySelector value={quantity} max={max} allowPreorder={allowPreorder} onChange={setQuantity} />
         </div>
-        <button type="button" onClick={onAddToCart} className="h-11 rounded-full bg-[#24231f] px-5 text-xs font-semibold uppercase tracking-[0.16em] text-[#f8f6f2]">
+        <button type="button" onClick={onAddToCart} className="h-11 rounded-full bg-[#24231f] px-5 text-xs font-normal uppercase tracking-[0.16em] text-[#f8f6f2]">
           Thêm giỏ
         </button>
       </div>
@@ -1103,9 +1102,9 @@ export default function ProductDetail() {
 
   if (!product) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-ivory to-whisper/40 px-5 text-center font-montserrat">
-        <p className="text-2xl font-light text-nero">Không tìm thấy sản phẩm.</p>
-        <button onClick={() => navigate("/")} className="mt-6 rounded-full bg-nero px-7 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-ivory transition hover:bg-champagne hover:text-nero">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-ivory to-whisper/40 px-5 text-center font-roboto">
+        <p className="text-2xl font-normal text-nero">Không tìm thấy sản phẩm.</p>
+        <button onClick={() => navigate("/")} className="mt-6 rounded-full bg-nero px-7 py-3 text-sm font-normal uppercase tracking-[0.18em] text-ivory transition hover:bg-champagne hover:text-nero">
           Về trang chủ
         </button>
       </main>
@@ -1113,7 +1112,7 @@ export default function ProductDetail() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-gradient-to-b from-ivory via-white to-whisper/30 font-montserrat text-nero">
+    <main className="min-h-screen overflow-hidden bg-gradient-to-b from-ivory via-white to-whisper/30 font-roboto text-nero">
       <Toast toast={toast} onClose={() => setToast(null)} />
 
       <section className="relative">
@@ -1179,7 +1178,7 @@ export default function ProductDetail() {
         ].map(([Icon, title, copy]) => (
           <motion.article key={title} variants={fadeUp} className="rounded-[1.75rem] border border-white/70 bg-white/45 p-7 shadow-[0_20px_70px_rgba(88,70,48,0.08)]">
             <Icon size={22} className="text-[#9a7d46]" />
-            <h3 className="mt-5 text-xl font-light text-[#25231f]">{title}</h3>
+            <h3 className="mt-5 text-xl font-normal text-[#25231f]">{title}</h3>
             <p className="mt-3 leading-7 text-[#665d52]">{copy}</p>
           </motion.article>
         ))}
@@ -1199,12 +1198,10 @@ export default function ProductDetail() {
         hasPurchased={hasPurchased}
       />
 
-      <SimilarProducts productId={productId} onAddToCart={handleAddToCart} />
-
       {/* Khách hàng cũng mua — co-occurrence trong đơn hàng (fallback Content-Based) */}
       <RecommendationCarousel
         key={`also-bought-${productId}`}
-        title="Khách hàng cũng mua"
+        title="Khách hàng khác cũng mua"
         eyebrow="Thường được mua cùng"
         icon={<ShoppingBag size={12} className="text-[#c4aa75]" />}
         endpoint={`/api/recommend/also-bought/${productId}`}

@@ -68,6 +68,7 @@ export default function OrderManager() {
   const paymentMethodOptions = [
     { value: "PM001", label: "COD" },
     { value: "PM002", label: "VNPay" },
+    { value: "PM003", label: "PayPal" },
   ];
 
   const getOrderStatusConfig = (status) => {
@@ -288,6 +289,10 @@ export default function OrderManager() {
           color = "blue";
           icon = <CreditCardOutlined />;
           label = "VNPay";
+        } else if (method.includes("PM003") || method.includes("PayPal")) {
+          color = "green";
+          icon = <CreditCardOutlined />;
+          label = "PayPal";
         }
 
         return (

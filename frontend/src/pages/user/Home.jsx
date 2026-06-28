@@ -2,6 +2,7 @@ import { Star, TrendingUp } from "lucide-react";
 import HeroSection from "../../components/landing/HeroSection";
 import BrandBar from "../../components/landing/BrandBar";
 import FeaturedCategories from "../../components/landing/FeaturedCategories";
+import FlashSaleSection from "../../components/landing/FlashSaleSection";
 import PersonalizedRecommendations from "../../components/PersonalizedRecommendations";
 import RecommendationCarousel from "../../components/recommend/RecommendationCarousel";
 import LifestyleSection from "../../components/landing/LifestyleSection";
@@ -19,6 +20,9 @@ export default function Home() {
 
       {/* 3. Featured Categories — Nike-style asymmetric grid */}
       <FeaturedCategories />
+
+      {/* 3b. Flash Sale — Ưu đãi có hạn (đồng bộ phong cách trang chủ) */}
+      <FlashSaleSection />
 
       {/* 4. Personalized Recommendations — "Dành riêng cho bạn" (For You) */}
       <PersonalizedRecommendations />

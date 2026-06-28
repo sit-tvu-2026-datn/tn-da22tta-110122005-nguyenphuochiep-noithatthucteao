@@ -8,9 +8,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Entity lưu hồ sơ sở thích (User Preference Profile) của từng người dùng.
- * Tổng hợp từ lịch sử tương tác để biết người dùng ưa thích Category / Material / Color / Origin nào nhất.
- * Dữ liệu chi tiết được lưu dạng JSON trong cột preference_data để dễ mở rộng thêm chiều mới.
+ * Entity luu ho so so thich (User Preference Profile) cua tung nguoi dung.
+ * Tong hop tu lich su tuong tac de biet nguoi dung ua thich Category / Material / Color / Origin nao nhat.
+ * Du lieu chi tiet duoc luu dang JSON trong cot preference_data de de mo rong them chieu moi.
  */
 @Entity
 @Table(
@@ -35,8 +35,14 @@ public class UserPreferenceProfile {
     @Column(name = "user_id", nullable = false, length = 50)
     private String userId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "user_id", insertable = false, updatable = false)
+    @lombok.ToString.Exclude
+    @lombok.EqualsAndHashCode.Exclude
+    private User user;
+
     /**
-     * JSON chứa 4 map điểm sở thích đã chuẩn hóa 0..1:
+     * JSON chua 4 map diem so thich da chuan hoa 0..1:
      * { "categoryScores": {...}, "materialScores": {...}, "colorScores": {...}, "originScores": {...} }
      */
     @Column(name = "preference_data", nullable = false, columnDefinition = "LONGTEXT")

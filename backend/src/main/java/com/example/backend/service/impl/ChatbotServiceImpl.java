@@ -1,12 +1,16 @@
 package com.example.backend.service.impl;
 
+import com.example.backend.DTO.ChatProductDTO;
 import com.example.backend.DTO.ChatRequest;
 import com.example.backend.DTO.ChatResponse;
+import com.example.backend.DTO.ChatSpecDTO;
 import com.example.backend.model.Category;
 import com.example.backend.model.Product;
 import com.example.backend.repository.CategoryRepository;
 import com.example.backend.repository.ProductRepository;
 import com.example.backend.service.ChatbotService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,9 +28,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -44,14 +50,27 @@ public class ChatbotServiceImpl implements ChatbotService {
     @Value("${openai.api.url}")
     private String apiUrl;
 
+    /**
+     * Bật JSON mode của API AI (response_format = json_object). Mặc định true.
+     * Nếu nhà cung cấp AI không hỗ trợ tham số này, đặt openai.json-mode.enabled=false
+     * trong .env — prompt vẫn yêu cầu AI trả JSON nên parser phía dưới vẫn hoạt động.
+     */
+    @Value("${openai.json-mode.enabled:true}")
+    private boolean jsonModeEnabled;
+
     private final RestTemplate restTemplate;
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final String FRONTEND_URL = "http://localhost:5173";
+    // Base URL của server chứa ảnh (đổi thành domain thật khi deploy)
+    private static final String IMAGE_BASE_URL = "http://localhost:8080";
 
-    // Số sản phẩm tối đa được đưa vào context gửi cho AI (sau khi pre-filter)
+    // Số sản phẩm tối đa đưa vào context gửi cho AI (sau khi pre-filter)
     private static final int MAX_PRODUCTS = 15;
+
+    // Số sản phẩm tối đa hiển thị trên 1 câu trả lời
+    private static final int MAX_RECOMMENDATIONS = 3;
 
     @Autowired
     public ChatbotServiceImpl(@Qualifier("chatbotRestTemplate") RestTemplate restTemplate,
@@ -65,312 +84,597 @@ public class ChatbotServiceImpl implements ChatbotService {
     @Override
     public ChatResponse getChatbotResponse(ChatRequest request) {
         try {
-            // 1. Lấy dữ liệu kho hàng (Context) — đã PRE-FILTER theo nhu cầu của khách
-            String productContext = getProductContextFromDB(request.getMessage(), request.getHistory());
-
-            // 2. Headers
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", "Bearer " + apiKey);
-
-            // 3. Chuẩn bị Body
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", model);
-            List<Map<String, Object>> messages = new ArrayList<>();
-
-            // === BƯỚC 1: SYSTEM PROMPT (LOGIC CHẶT CHẼ) ===
-            String promptContent = "=== VAI TRÒ ===\n" +
-                    "Bạn là CHUYÊN VIÊN TƯ VẤN NỘI THẤT của NPH Store.\n" +
-                    "Bạn có nhiệm vụ tư vấn sản phẩm nội thất dựa trên dữ liệu kho hàng được cung cấp.\n" +
-                    "Bạn phải luôn trả lời như một nhân viên tư vấn bán hàng chuyên nghiệp, thân thiện và tự nhiên.\n\n"
-                    +
-
-                    "=== PHẠM VI HỖ TRỢ ===\n" +
-                    "- Nội thất phòng khách.\n" +
-                    "- Nội thất phòng ngủ.\n" +
-                    "- Nội thất phòng bếp.\n" +
-                    "- Nội thất phòng làm việc.\n" +
-                    "- Đồ trang trí, đèn, thảm, decor.\n" +
-                    "- Tư vấn kích thước, chất liệu, màu sắc.\n" +
-                    "- Tư vấn bố trí nội thất phù hợp không gian.\n\n" +
-
-                    "=== CHỦ ĐỀ TỪ CHỐI ===\n" +
-                    "Chỉ từ chối khi người dùng hỏi các chủ đề sau:\n" +
-                    "- Lập trình, viết code, công nghệ thông tin.\n" +
-                    "- Toán học, vật lý, hóa học.\n" +
-                    "- Chính trị.\n" +
-                    "- Tôn giáo.\n" +
-                    "- Y tế, thuốc, chẩn đoán bệnh.\n" +
-                    "- Pháp luật.\n" +
-                    "- Các nội dung không liên quan đến nội thất hoặc mua sắm nội thất.\n\n" +
-
-                    "Nếu gặp chủ đề bị cấm, trả lời chính xác:\n" +
-                    "\"Dạ em chỉ là nhân viên tư vấn nội thất nên không hỗ trợ được nội dung này ạ. Mình quay lại chọn nội thất cho ngôi nhà của mình nhé!\"\n\n"
-                    +
-
-                    "=== DỮ LIỆU KHO HÀNG ===\n" +
-                    "Chỉ được sử dụng dữ liệu bên dưới.\n" +
-                    "Không được tự tạo sản phẩm mới.\n" +
-                    "Không được tự tạo giá tiền.\n" +
-                    "Không được tự tạo kích thước.\n" +
-                    "Không được tự tạo link sản phẩm.\n" +
-                    "Không được tự tạo hình ảnh.\n\n" +
-
-                    "--- KHO HÀNG BẮT ĐẦU ---\n" +
-                    productContext + "\n" +
-                    "--- KHO HÀNG KẾT THÚC ---\n\n" +
-
-                    "=== TRẢ LỜI CÂU HỎI VỀ THÔNG SỐ / CHI TIẾT SẢN PHẨM ===\n" +
-                    "Mỗi sản phẩm trong kho có trường 'Thông số' gồm: Kích thước (Dài x Rộng x Cao, đơn vị cm), Cân nặng, Màu sắc, Chất liệu, Bảo hành, Xuất xứ.\n" +
-                    "- Khi khách hỏi về thông số/chi tiết (vd: 'dài rộng cao bao nhiêu', 'kích thước thế nào', 'chất liệu gì', 'nặng bao nhiêu', 'bảo hành mấy năm', 'màu gì', 'xuất xứ ở đâu'): PHẢI trả lời TRỰC TIẾP và ĐÚNG TRỌNG TÂM đúng thông số được hỏi, lấy số liệu từ trường 'Thông số' của chính sản phẩm đó.\n" +
-                    "- Nếu khách hỏi 'dài rộng cao' thì nêu rõ từng chiều: Dài ... cm, Rộng ... cm, Cao ... cm. KHÔNG trả lời lan man sang giá hoặc sản phẩm khác trừ khi khách hỏi.\n" +
-                    "- Xác định đúng sản phẩm khách đang hỏi: dựa vào tên sản phẩm trong câu hỏi, hoặc sản phẩm vừa được nhắc tới gần nhất trong lịch sử trò chuyện.\n" +
-                    "- TUYỆT ĐỐI KHÔNG bịa thông số. Nếu trường 'Thông số' ghi 'Chưa cập nhật' hoặc thiếu đúng chỉ số khách hỏi: trả lời trung thực rằng shop chưa cập nhật thông số đó và mời khách để lại liên hệ để được hỗ trợ, KHÔNG tự nghĩ ra con số.\n" +
-                    "- Với câu hỏi thuần về thông số, trả lời ngắn gọn đúng trọng tâm; có thể kèm thẻ sản phẩm nhưng KHÔNG bắt buộc trình bày theo mẫu danh sách đề xuất.\n\n" +
-
-                    "=== PHÂN TÍCH YÊU CẦU KHÁCH HÀNG ===\n" +
-                    "Trước khi trả lời, hãy xác định:\n" +
-                    "1. Loại phòng.\n" +
-                    "2. Diện tích phòng (nếu có).\n" +
-                    "3. Ngân sách (nếu có).\n" +
-                    "4. Phong cách (nếu có).\n" +
-                    "5. Màu sắc yêu thích (nếu có).\n" +
-                    "6. Nhu cầu đặc biệt (nếu có).\n\n" +
-
-                    "Ví dụ:\n" +
-                    "Khách hỏi: 'Tư vấn phòng ngủ 10m2 khoảng 10 triệu'\n" +
-                    "=> Loại phòng: Phòng ngủ\n" +
-                    "=> Diện tích: 10m2\n" +
-                    "=> Ngân sách: 10 triệu\n\n" +
-
-                    "Khách hỏi: 'Phòng khách hiện đại khoảng 20 triệu'\n" +
-                    "=> Loại phòng: Phòng khách\n" +
-                    "=> Phong cách: Hiện đại\n" +
-                    "=> Ngân sách: 20 triệu\n\n" +
-
-                    "=== SUY LUẬN NHÓM SẢN PHẨM ===\n" +
-                    "Nếu khách hỏi về phòng khách:\n" +
-                    "- Ưu tiên Sofa.\n" +
-                    "- Bàn trà.\n" +
-                    "- Kệ TV.\n" +
-                    "- Đèn trang trí.\n\n" +
-
-                    "Nếu khách hỏi về phòng ngủ:\n" +
-                    "- Ưu tiên Giường ngủ.\n" +
-                    "- Tab đầu giường.\n" +
-                    "- Tủ quần áo.\n" +
-                    "- Đèn ngủ.\n\n" +
-
-                    "Nếu khách hỏi về phòng bếp:\n" +
-                    "- Bàn ăn.\n" +
-                    "- Ghế ăn.\n" +
-                    "- Tủ bếp.\n\n" +
-
-                    "Nếu khách hỏi về phòng làm việc:\n" +
-                    "- Bàn làm việc.\n" +
-                    "- Ghế làm việc.\n" +
-                    "- Kệ sách.\n\n" +
-
-                    "=== QUY TẮC DIỆN TÍCH ===\n" +
-                    "Nếu khách cung cấp diện tích:\n\n" +
-
-                    "- Dưới 12m2:\n" +
-                    "  + Ưu tiên sản phẩm nhỏ gọn.\n" +
-                    "  + Tránh sản phẩm quá lớn.\n\n" +
-
-                    "- Từ 12m2 đến 20m2:\n" +
-                    "  + Ưu tiên sản phẩm kích thước tiêu chuẩn.\n\n" +
-
-                    "- Trên 20m2:\n" +
-                    "  + Có thể chọn sản phẩm lớn hơn.\n\n" +
-
-                    "Nếu dữ liệu sản phẩm có chiều dài, chiều rộng hoặc chiều cao:\n" +
-                    "Hãy ưu tiên sản phẩm phù hợp diện tích phòng.\n\n" +
-
-                    "=== QUY TẮC NGÂN SÁCH ===\n" +
-                    "Nếu khách cung cấp ngân sách:\n" +
-                    "- Với các sản phẩm THAY THẾ nhau (cùng danh mục): GIÁ CỦA TỪNG sản phẩm phải nhỏ hơn hoặc bằng ngân sách. TUYỆT ĐỐI KHÔNG cộng dồn giá các sản phẩm thay thế rồi đem so với ngân sách.\n" +
-                    "- Chỉ khi khách yêu cầu COMBO/trọn bộ gồm nhiều món KHÁC danh mục: khi đó TỔNG giá các món trong combo mới phải nhỏ hơn hoặc bằng ngân sách.\n" +
-                    "- Ưu tiên sản phẩm có tỷ lệ giá/chất lượng tốt.\n" +
-                    "- Nếu ngân sách thấp, ưu tiên các món nội thất quan trọng trước.\n" +
-                    "- Không được đề xuất sản phẩm vượt quá ngân sách nếu còn lựa chọn phù hợp khác.\n\n" +
-
-                    "=== QUY TẮC LỌC SẢN PHẨM ===\n" +
-                    "- Chỉ sử dụng sản phẩm có trong kho hàng.\n" +
-                    "- Không được bịa sản phẩm.\n" +
-                    "- Không được bịa giá.\n" +
-                    "- Không được bịa thông tin tồn kho.\n" +
-                    "- Ưu tiên sản phẩm còn hàng.\n" +
-                    "- Ưu tiên sản phẩm phù hợp diện tích.\n" +
-                    "- Ưu tiên sản phẩm phù hợp ngân sách.\n\n" +
-
-                    "=== KHI KHÔNG TÌM THẤY ===\n" +
-                    "Nếu kho hàng không có sản phẩm phù hợp:\n" +
-                    "- Trả lời trung thực.\n" +
-                    "- Gợi ý danh mục gần nhất nếu có.\n" +
-                    "- Không dùng câu từ chối dành cho chủ đề cấm.\n\n" +
-
-                    "Ví dụ:\n" +
-                    "'Hiện tại shop chưa có mẫu giường ngủ phù hợp ngân sách này ạ. Anh/chị có thể tham khảo các mẫu tab đầu giường hoặc tăng thêm ngân sách để có nhiều lựa chọn hơn.'\n\n"
-                    +
-
-                    "=== QUY TẮC GIAO TIẾP ===\n" +
-                    "- Luôn xưng hô: em.\n" +
-                    "- Gọi khách là: anh/chị.\n" +
-                    "- Thân thiện, lịch sự.\n" +
-                    "- Nếu khách phàn nàn hoặc không hài lòng, phải xin lỗi trước.\n\n" +
-
-                    "=== PHÂN BIỆT SẢN PHẨM THAY THẾ & BỔ SUNG (RẤT QUAN TRỌNG) ===\n" +
-                    "Mỗi sản phẩm trong kho đều có trường 'Danh mục'. BẮT BUỘC dựa vào danh mục để phân loại:\n" +
-                    "- SẢN PHẨM THAY THẾ (alternative): các sản phẩm CÙNG một danh mục chính (vd: nhiều mẫu Sofa, nhiều mẫu Giường, nhiều Tivi, nhiều Tủ lạnh). Đây là các LỰA CHỌN khác nhau cho CÙNG một nhu cầu — khách thường chỉ mua MỘT trong số đó.\n" +
-                    "- SẢN PHẨM BỔ SUNG (complementary): các sản phẩm thuộc các danh mục KHÁC NHAU nhưng dùng chung trong một không gian (vd: Sofa + Bàn trà + Đèn + Thảm). Đây là các món có thể mua KÈM nhau.\n\n" +
-
-                    "NGUYÊN TẮC BẮT BUỘC:\n" +
-                    "- TUYỆT ĐỐI KHÔNG cộng giá của các sản phẩm THAY THẾ (cùng danh mục) với nhau.\n" +
-                    "- TUYỆT ĐỐI KHÔNG tạo 'Tổng chi phí dự kiến' từ các sản phẩm thay thế.\n" +
-                    "- KHÔNG dùng từ ngữ khiến khách hiểu rằng nên mua tất cả các sản phẩm thay thế cùng lúc.\n" +
-                    "- Khi có nhiều sản phẩm cùng phù hợp: chọn 1 sản phẩm TỐT NHẤT làm khuyến nghị chính, các sản phẩm còn lại là 'lựa chọn thay thế', và nêu ngắn gọn ưu/nhược của từng lựa chọn.\n\n" +
-
-                    "=== ĐỊNH DẠNG KẾT QUẢ ===\n" +
-                    "Trước khi viết, hãy ĐẾM số danh mục khác nhau trong những sản phẩm em chọn để hiển thị, rồi chọn 1 trong 2 mẫu sau:\n\n" +
-
-                    "--- MẪU A: các sản phẩm CÙNG một danh mục (lựa chọn thay thế) ---\n" +
-                    "Mở đầu: 'Dạ với nhu cầu của anh/chị, em xin gợi ý các lựa chọn phù hợp:'\n" +
-                    "Liệt kê từng sản phẩm (KHÔNG trình bày như một bộ phải mua chung), chỉ rõ đâu là lựa chọn em đề xuất nhất:\n" +
-                    "[Tên Sản Phẩm](Link) ![GiáGốc|GiáGiảm](LinkẢnh)\n" +
-                    "Ưu điểm: ... | Phù hợp với: ...\n" +
-                    "[Tên Sản Phẩm](Link) ![GiáGốc|GiáGiảm](LinkẢnh)\n" +
-                    "Ưu điểm: ... | Phù hợp với: ...\n" +
-                    "Kết thúc bằng dòng: 'Các lựa chọn phù hợp cho anh/chị tham khảo ạ.'\n" +
-                    "=> Ở MẪU A: TUYỆT ĐỐI KHÔNG ghi 'Tổng chi phí dự kiến' và KHÔNG cộng giá.\n\n" +
-
-                    "--- MẪU B: các sản phẩm thuộc NHIỀU danh mục bổ sung nhau (combo/trọn bộ) HOẶC khách yêu cầu combo ---\n" +
-                    "Mở đầu: 'Dạ em xin đề xuất bộ sản phẩm cho không gian của anh/chị:'\n" +
-                    "[Tên Sản Phẩm](Link) ![GiáGốc|GiáGiảm](LinkẢnh)\n" +
-                    "[Tên Sản Phẩm](Link) ![GiáGốc|GiáGiảm](LinkẢnh)\n" +
-                    "Khi đó MỚI được ghi: 'Tổng chi phí dự kiến: XXX VNĐ' (chỉ cộng giá các món KHÁC danh mục trong combo).\n\n" +
-
-                    "Sau cùng, nêu 'Lý do lựa chọn' ngắn gọn (phù hợp diện tích / ngân sách / nhu cầu).\n\n" +
-
-                    "=== QUY TẮC HIỂN THỊ ===\n" +
-                    "- Chỉ hiển thị tối đa 3 sản phẩm.\n" +
-                    "- Chỉ hiển thị sản phẩm đã lọc, có trong kho.\n" +
-                    "- Không viết mô tả dài cho từng sản phẩm.\n" +
-                    "- Giá trong ![] chỉ được là số nguyên, không thêm ký tự tiền tệ.\n" +
-                    "- CHỈ hiển thị 'Tổng chi phí dự kiến' khi áp dụng MẪU B (nhiều món KHÁC danh mục/combo, hoặc khách yêu cầu combo).\n" +
-                    "- Nếu tất cả sản phẩm hiển thị thuộc CÙNG một danh mục: KHÔNG tính tổng, KHÔNG dùng cụm từ 'Tổng chi phí dự kiến', thay bằng 'Các lựa chọn phù hợp'.\n";
-                    
-            // Add System Prompt
-            messages.add(Map.of("role", "system", "content", promptContent));
-
-            if (request.getHistory() != null && !request.getHistory().isEmpty()) {
-                // Ép kiểu về Map<String, Object> để tương thích với List messages
-                for (Map<String, String> histMsg : request.getHistory()) {
-                    messages.add(new HashMap<>(histMsg));
-                }
+            // 0. THAM CHIẾU THEO NGỮ CẢNH: nếu khách nhắc tới sản phẩm theo số thứ tự
+            //    ("sản phẩm số 2", "mẫu thứ 3"...) -> trả chi tiết NGAY, không cần gọi AI.
+            ChatResponse ordinalResponse = tryResolveOrdinalReference(request);
+            if (ordinalResponse != null) {
+                return ordinalResponse;
             }
 
-            // === BƯỚC 3: CÂU HỎI MỚI CỦA USER (LUÔN CUỐI CÙNG) ===
-            messages.add(Map.of("role", "user", "content", request.getMessage()));
+            // 1. Lấy sản phẩm còn hàng + pre-filter theo nhu cầu khách
+            List<Product> inStock = productRepository.findProductsForChatbot();
+            Map<String, String> categoryNames = loadCategoryDisplayNames();
 
-            requestBody.put("messages", messages);
+            String searchText = buildSearchText(request.getMessage(), request.getHistory());
+            List<Product> relevant = inStock.isEmpty()
+                    ? new ArrayList<>()
+                    : filterRelevantProducts(searchText, inStock);
 
-            // 4. Call API
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(apiUrl, entity, Map.class);
+            // Map id -> Product để HYDRATE. Chỉ id nằm trong danh sách đã cấp cho AI mới
+            // được dựng thẻ -> chặn AI bịa id hoặc đề xuất sản phẩm ngoài kho.
+            Map<String, Product> byId = new LinkedHashMap<>();
+            for (Product p : relevant) {
+                byId.put(p.getProductId(), p);
+            }
 
-            Map<String, Object> responseBody = response.getBody();
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
-            Map<String, Object> messageObj = (Map<String, Object>) choices.get(0).get("message");
-            String content = (String) messageObj.get("content");
+            // 2. Build context (kèm ID, KHÔNG kèm link/ảnh — backend tự dựng các trường này)
+            String productContext = buildProductContext(relevant, categoryNames);
 
-            return new ChatResponse(content);
+            // 3. Gọi AI -> nhận chuỗi JSON
+            String aiContent = callAi(request, productContext);
+
+            // 4. Parse JSON của AI rồi hydrate dữ liệu sản phẩm thật từ DB
+            return buildResponseFromAi(aiContent, byId, categoryNames);
 
         } catch (Exception e) {
             e.printStackTrace();
-            return new ChatResponse("Hệ thống đang bảo trì, vui lòng thử lại sau.");
+            return ChatResponse.text("Hệ thống đang bảo trì, vui lòng thử lại sau.");
         }
     }
 
-    private String getProductContextFromDB(String userMessage, List<Map<String, String>> history) {
-        // Chỉ lấy sản phẩm còn hàng (quantity > 0) thay vì findAll()
-        List<Product> products = productRepository.findProductsForChatbot();
-        if (products.isEmpty())
-            return "Kho đang cập nhật.";
+    // ====================================================================
+    // ============== GỌI AI & DỰNG PROMPT (TRẢ VỀ JSON) ==================
+    // ====================================================================
 
-        // === PRE-FILTER: chỉ giữ lại sản phẩm liên quan tới nhu cầu của khách ===
-        String searchText = buildSearchText(userMessage, history);
-        List<Product> relevant = filterRelevantProducts(searchText, products);
+    @SuppressWarnings("unchecked")
+    private String callAi(ChatRequest request, String productContext) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer " + apiKey);
 
-        // Map categoryId -> tên danh mục (gốc) để gắn vào context. Nhờ đó AI phân biệt được
-        // sản phẩm THAY THẾ (cùng danh mục) với sản phẩm BỔ SUNG (khác danh mục) và không
-        // cộng nhầm giá các lựa chọn thay thế thành một "tổng chi phí".
-        Map<String, String> categoryDisplayNames = new HashMap<>();
-        for (Category c : categoryRepository.findAll()) {
-            if (c.getCategoryId() != null) {
-                categoryDisplayNames.put(c.getCategoryId(), safe(c.getCategoryName()));
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", model);
+        if (jsonModeEnabled) {
+            // Ép AI trả về JSON object hợp lệ (OpenAI-compatible)
+            requestBody.put("response_format", Map.of("type", "json_object"));
+        }
+
+        List<Map<String, Object>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", buildSystemPrompt(productContext)));
+
+        if (request.getHistory() != null && !request.getHistory().isEmpty()) {
+            for (Map<String, String> histMsg : request.getHistory()) {
+                messages.add(new HashMap<>(histMsg));
+            }
+        }
+        messages.add(Map.of("role", "user", "content", safe(request.getMessage())));
+        requestBody.put("messages", messages);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+        ResponseEntity<Map> response = restTemplate.postForEntity(apiUrl, entity, Map.class);
+
+        Map<String, Object> responseBody = response.getBody();
+        if (responseBody == null) {
+            return "";
+        }
+        List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
+        if (choices == null || choices.isEmpty()) {
+            return "";
+        }
+        Map<String, Object> messageObj = (Map<String, Object>) choices.get(0).get("message");
+        if (messageObj == null) {
+            return "";
+        }
+        Object content = messageObj.get("content");
+        return content == null ? "" : content.toString();
+    }
+
+    private String buildSystemPrompt(String productContext) {
+        return "=== VAI TRÒ ===\n" +
+                "Bạn là CHUYÊN VIÊN TƯ VẤN NỘI THẤT của NPH Store, thân thiện và chuyên nghiệp.\n" +
+                "Nhiệm vụ: tư vấn nội thất dựa trên DỮ LIỆU KHO HÀNG được cấp, và LUÔN trả về kết quả dưới dạng JSON đúng định dạng quy định bên dưới.\n\n"
+                +
+
+                "=== PHẠM VI HỖ TRỢ ===\n" +
+                "- Nội thất phòng khách, phòng ngủ, phòng bếp, phòng làm việc.\n" +
+                "- Đồ trang trí, đèn, thảm, decor.\n" +
+                "- Tư vấn kích thước, chất liệu, màu sắc, bố trí không gian.\n\n" +
+
+                "=== CHỦ ĐỀ TỪ CHỐI ===\n" +
+                "Chỉ từ chối khi khách hỏi: lập trình/CNTT, toán-lý-hóa, chính trị, tôn giáo, y tế/thuốc, pháp luật, hoặc nội dung không liên quan nội thất.\n"
+                +
+                "Khi gặp chủ đề bị cấm, trả về type \"text\" với message đúng nguyên văn:\n" +
+                "\"Dạ em chỉ là nhân viên tư vấn nội thất nên không hỗ trợ được nội dung này ạ. Mình quay lại chọn nội thất cho ngôi nhà của mình nhé!\"\n\n"
+                +
+
+                "=== DỮ LIỆU KHO HÀNG ===\n" +
+                "Chỉ được dùng dữ liệu bên dưới. KHÔNG tự tạo sản phẩm, giá, kích thước, hình ảnh hay đường link.\n" +
+                "Mỗi dòng có trường 'ID' là mã sản phẩm — dùng CHÍNH XÁC mã này khi đề xuất.\n" +
+                "--- KHO HÀNG BẮT ĐẦU ---\n" +
+                productContext + "\n" +
+                "--- KHO HÀNG KẾT THÚC ---\n\n" +
+
+                "=== ĐỊNH DẠNG TRẢ VỀ (BẮT BUỘC) ===\n" +
+                "Bạn PHẢI trả về DUY NHẤT một object JSON hợp lệ, KHÔNG kèm bất kỳ chữ nào khác, KHÔNG bọc trong dấu ```.\n" +
+                "Cấu trúc JSON:\n" +
+                "{\n" +
+                "  \"type\": \"text\" | \"product_recommendation\",\n" +
+                "  \"message\": \"lời tư vấn thân thiện cho khách\",\n" +
+                "  \"products\": [ { \"id\": \"MÃ_SẢN_PHẨM\", \"highlights\": [\"ý ngắn 1\", \"ý ngắn 2\"] } ]\n" +
+                "}\n\n" +
+
+                "QUY TẮC JSON:\n" +
+                "- Dùng \"type\": \"product_recommendation\" khi muốn giới thiệu sản phẩm cụ thể từ kho; ngược lại dùng \"type\": \"text\".\n"
+                +
+                "- Với \"type\": \"text\": bỏ trường \"products\" hoặc để mảng rỗng [].\n" +
+                "- \"message\": văn bản THUẦN, thân thiện. TUYỆT ĐỐI KHÔNG chứa: URL/link, giá tiền, markdown, HTML, hình ảnh, hay danh sách tên sản phẩm kèm giá. KHÔNG liệt kê giá hay đường dẫn — giao diện sẽ tự hiển thị thẻ sản phẩm.\n"
+                +
+                "- \"id\": copy CHÍNH XÁC từ trường 'ID' trong kho hàng. KHÔNG bịa id, KHÔNG dùng sản phẩm ngoài kho.\n" +
+                "- \"highlights\": 2-4 ý RẤT ngắn (mỗi ý dưới 8 từ) nêu ưu điểm/độ phù hợp. KHÔNG chứa giá, link, HTML, markdown.\n" +
+                "- Tối đa " + MAX_RECOMMENDATIONS + " sản phẩm trong \"products\".\n\n" +
+
+                "=== KHI NÀO DÙNG product_recommendation / text ===\n" +
+                "- product_recommendation: khi khách cần tìm/mua/gợi ý sản phẩm VÀ kho có món phù hợp.\n" +
+                "- text: chào hỏi; trả lời câu hỏi thông số/chi tiết của một sản phẩm; từ chối chủ đề cấm; hoặc khi kho KHÔNG có sản phẩm phù hợp (nói trung thực trong message).\n\n"
+                +
+
+                "=== PHÂN TÍCH NHU CẦU ===\n" +
+                "Xác định (nếu khách nêu): loại phòng, diện tích, ngân sách, phong cách, màu sắc, nhu cầu đặc biệt — để chọn đúng sản phẩm.\n\n"
+                +
+
+                "=== GỢI Ý THEO PHÒNG ===\n" +
+                "- Phòng khách: Sofa, bàn trà, kệ TV, đèn trang trí.\n" +
+                "- Phòng ngủ: giường, tab đầu giường, tủ quần áo, đèn ngủ.\n" +
+                "- Phòng bếp: bàn ăn, ghế ăn, tủ bếp.\n" +
+                "- Phòng làm việc: bàn làm việc, ghế, kệ sách.\n\n" +
+
+                "=== QUY TẮC DIỆN TÍCH ===\n" +
+                "- Dưới 12m2: ưu tiên sản phẩm nhỏ gọn.\n" +
+                "- 12-20m2: kích thước tiêu chuẩn.\n" +
+                "- Trên 20m2: có thể chọn sản phẩm lớn hơn.\n" +
+                "Dựa vào kích thước (Dài x Rộng x Cao) trong 'Thông số' để chọn cho phù hợp.\n\n" +
+
+                "=== QUY TẮC NGÂN SÁCH ===\n" +
+                "- Với sản phẩm THAY THẾ nhau (cùng danh mục): giá TỪNG sản phẩm phải nhỏ hơn hoặc bằng ngân sách. TUYỆT ĐỐI KHÔNG cộng dồn giá các lựa chọn thay thế.\n"
+                +
+                "- Chỉ khi khách yêu cầu COMBO nhiều món KHÁC danh mục: tổng giá combo mới cần nhỏ hơn hoặc bằng ngân sách.\n" +
+                "- Không đề xuất sản phẩm vượt ngân sách nếu còn lựa chọn phù hợp.\n\n" +
+
+                "=== THAY THẾ vs BỔ SUNG ===\n" +
+                "- THAY THẾ: cùng danh mục (nhiều mẫu Sofa...) — là các lựa chọn cho cùng một nhu cầu; chọn 1 sản phẩm tốt nhất làm đề xuất chính, còn lại là lựa chọn thay thế.\n"
+                +
+                "- BỔ SUNG: khác danh mục dùng chung không gian (Sofa + bàn trà + đèn) — có thể đi kèm nhau.\n" +
+                "TUYỆT ĐỐI KHÔNG gộp giá các sản phẩm thay thế thành 'tổng chi phí'. KHÔNG đưa con số tổng tiền vào message.\n\n" +
+
+                "=== TRẢ LỜI CÂU HỎI THÔNG SỐ ===\n" +
+                "Khi khách hỏi chi tiết (kích thước/chất liệu/màu/bảo hành/xuất xứ...): trả về \"type\": \"text\", message nêu ĐÚNG thông số được hỏi, lấy từ 'Thông số' của đúng sản phẩm (xác định qua tên trong câu hỏi hoặc sản phẩm vừa nhắc gần nhất). KHÔNG bịa số liệu; nếu 'Thông số' ghi 'Chưa cập nhật' thì nói trung thực là shop chưa cập nhật.\n\n"
+                +
+
+                "=== GIAO TIẾP ===\n" +
+                "- Xưng 'em', gọi khách 'anh/chị'. Lịch sự, thân thiện. Nếu khách phàn nàn thì xin lỗi trước.\n\n" +
+
+                "=== VÍ DỤ (chỉ minh hoạ ĐỊNH DẠNG JSON) ===\n" +
+                "Khách: 'Xin chào'\n" +
+                "{\"type\":\"text\",\"message\":\"Dạ em chào anh/chị! Em có thể giúp anh/chị tìm sofa, bàn ăn, giường ngủ... hoặc tư vấn bố trí không gian ạ.\"}\n"
+                +
+                "Khách: 'Tìm sofa phòng khách khoảng 10 triệu'\n" +
+                "{\"type\":\"product_recommendation\",\"message\":\"Dạ với phòng khách và ngân sách khoảng 10 triệu, em xin gợi ý vài mẫu sofa phù hợp ạ:\",\"products\":[{\"id\":\"SF001\",\"highlights\":[\"Đệm êm cao cấp\",\"Phù hợp phòng khách vừa\",\"Tông màu dễ phối\"]}]}\n"
+                +
+                "Khách: 'Mẫu giường đó cao bao nhiêu?'\n" +
+                "{\"type\":\"text\",\"message\":\"Dạ mẫu giường đó có chiều cao 120 cm ạ.\"}\n";
+    }
+
+    // ====================================================================
+    // =============== PARSE JSON CỦA AI & HYDRATE TỪ DB ==================
+    // ====================================================================
+
+    private ChatResponse buildResponseFromAi(String aiContent,
+            Map<String, Product> byId,
+            Map<String, String> categoryNames) {
+        JsonNode root = parseJsonLenient(aiContent);
+
+        if (root == null) {
+            // Không parse được JSON -> trả text an toàn (đã làm sạch markdown/HTML)
+            String fallback = sanitizeText(aiContent);
+            if (fallback.isBlank()) {
+                fallback = "Dạ em chưa rõ ý của anh/chị, anh/chị mô tả thêm giúp em nhé!";
+            }
+            return ChatResponse.text(fallback);
+        }
+
+        String type = root.path("type").asText(ChatResponse.TYPE_TEXT);
+        String message = sanitizeText(root.path("message").asText(""));
+
+        List<ChatProductDTO> hydrated = new ArrayList<>();
+        if (ChatResponse.TYPE_PRODUCT_RECOMMENDATION.equals(type)) {
+            JsonNode productsNode = root.path("products");
+            if (productsNode.isArray()) {
+                Set<String> usedIds = new LinkedHashSet<>();
+                for (JsonNode pn : productsNode) {
+                    String id = pn.path("id").asText("").trim();
+                    if (id.isEmpty() || usedIds.contains(id)) {
+                        continue;
+                    }
+                    Product p = byId.get(id);
+                    if (p == null) {
+                        continue; // chặn id bịa / sản phẩm ngoài kho
+                    }
+                    usedIds.add(id);
+                    hydrated.add(toCard(p, categoryNames, extractHighlights(pn, p)));
+                    if (hydrated.size() >= MAX_RECOMMENDATIONS) {
+                        break;
+                    }
+                }
             }
         }
 
-        // !!! QUAN TRỌNG: Thay đổi domain này thành domain thật của server chứa ảnh
-        String IMAGE_BASE_URL = "http://localhost:8080";
+        if (message.isBlank()) {
+            message = hydrated.isEmpty()
+                    ? "Dạ em chưa tìm thấy sản phẩm phù hợp, anh/chị mô tả thêm nhu cầu giúp em nhé!"
+                    : "Dạ với nhu cầu của anh/chị, em xin gợi ý các lựa chọn phù hợp:";
+        }
 
-        return relevant.stream()
+        // Nếu AI nói recommendation nhưng không có id hợp lệ -> hạ về text (tránh carousel rỗng)
+        return hydrated.isEmpty()
+                ? ChatResponse.text(message)
+                : ChatResponse.recommendation(message, hydrated);
+    }
+
+    /** Parse JSON "khoan dung": bỏ code fence, hoặc trích object {...} đầu/cuối nếu cần. */
+    private JsonNode parseJsonLenient(String content) {
+        if (content == null) {
+            return null;
+        }
+        String c = content.trim();
+        if (c.isEmpty()) {
+            return null;
+        }
+        // Bỏ code fence ```json ... ```
+        if (c.startsWith("```")) {
+            c = c.replaceFirst("^```[a-zA-Z]*", "").trim();
+            if (c.endsWith("```")) {
+                c = c.substring(0, c.length() - 3).trim();
+            }
+        }
+        try {
+            return objectMapper.readTree(c);
+        } catch (Exception ignored) {
+            // thử trích object JSON đầu tiên -> đóng ngoặc cuối cùng
+        }
+        int start = c.indexOf('{');
+        int end = c.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            try {
+                return objectMapper.readTree(c.substring(start, end + 1));
+            } catch (Exception ignored) {
+                // bỏ qua
+            }
+        }
+        return null;
+    }
+
+    /** Dựng thẻ sản phẩm CÓ CẤU TRÚC từ dữ liệu DB (nguồn sự thật) + highlights của AI. */
+    private ChatProductDTO toCard(Product p, Map<String, String> categoryNames, List<String> highlights) {
+        PriceInfo pi = computePrice(p);
+        String category = categoryNames.getOrDefault(safe(p.getCategoryId()), "Khác");
+        return ChatProductDTO.builder()
+                .id(p.getProductId())
+                .name(p.getProductName())
+                .price(pi.price)
+                .oldPrice(pi.oldPrice)
+                .image(resolveImageUrl(p))
+                .url("/product/" + p.getProductId())
+                .category(category)
+                .highlights(highlights)
+                .build();
+    }
+
+    // ====================================================================
+    // ====== THAM CHIẾU SẢN PHẨM THEO SỐ THỨ TỰ (NGỮ CẢNH HỘI THOẠI) =====
+    // ====================================================================
+
+    /**
+     * Nếu câu hỏi là tham chiếu theo số thứ tự tới danh sách gợi ý GẦN NHẤT
+     * (vd: "sản phẩm số 2", "xem chi tiết mẫu thứ 3", "thông tin mẫu thứ nhất"),
+     * trả về phản hồi product_detail tương ứng (KHÔNG gọi AI, không hỏi lại tên).
+     * Ngược lại trả null để đi tiếp luồng tư vấn AI bình thường.
+     */
+    private ChatResponse tryResolveOrdinalReference(ChatRequest request) {
+        List<String> lastIds = request.getLastRecommendedProductIds();
+        if (lastIds == null || lastIds.isEmpty()) {
+            return null;
+        }
+        List<String> ids = lastIds.stream()
+                .filter(s -> s != null && !s.isBlank())
+                .collect(Collectors.toList());
+        if (ids.isEmpty()) {
+            return null;
+        }
+
+        Integer ordinal = detectOrdinalReference(request.getMessage(), ids.size());
+        if (ordinal == null) {
+            return null; // không phải tham chiếu thứ tự -> để AI xử lý
+        }
+        if (ordinal < 1 || ordinal > ids.size()) {
+            // Có ý định tham chiếu nhưng vượt phạm vi -> hỏi lại nhẹ nhàng
+            return ChatResponse.text("Dạ danh sách em vừa gợi ý chỉ có " + ids.size()
+                    + " mẫu thôi ạ. Anh/chị muốn xem chi tiết mẫu số mấy (1-" + ids.size() + ") giúp em nhé?");
+        }
+
+        String productId = ids.get(ordinal - 1);
+        Optional<Product> productOpt = productRepository.findById(productId);
+        if (productOpt.isEmpty()) {
+            return null; // sản phẩm không còn -> để AI xử lý tự nhiên
+        }
+
+        Product p = productOpt.get();
+        Map<String, String> categoryNames = loadCategoryDisplayNames();
+        ChatProductDTO detail = toDetailCard(p, categoryNames);
+        String message = "Dạ đây là thông tin chi tiết của " + p.getProductName()
+                + " (mẫu số " + ordinal + ") ạ:";
+        return ChatResponse.detail(message, detail);
+    }
+
+    private static final Map<String, Integer> ORDINAL_WORDS = new HashMap<>();
+    static {
+        ORDINAL_WORDS.put("nhat", 1);
+        ORDINAL_WORDS.put("nhi", 2);
+        ORDINAL_WORDS.put("hai", 2);
+        ORDINAL_WORDS.put("ba", 3);
+        ORDINAL_WORDS.put("tu", 4);
+        ORDINAL_WORDS.put("bon", 4);
+        ORDINAL_WORDS.put("nam", 5);
+        ORDINAL_WORDS.put("sau", 6);
+        ORDINAL_WORDS.put("bay", 7);
+        ORDINAL_WORDS.put("tam", 8);
+        ORDINAL_WORDS.put("chin", 9);
+        ORDINAL_WORDS.put("muoi", 10);
+    }
+
+    // Nếu con số đứng ngay trước các đơn vị này thì đó là ngân sách/kích thước, KHÔNG phải số thứ tự.
+    private static final String UNIT_LOOKAHEAD =
+            "(?!\\s*(?:trieu|tr|nghin|ngan|ty|k|dong|m2|met|cm|kg|nam|ngay|thang)\\b)";
+
+    /**
+     * Nhận diện tham chiếu theo số thứ tự. Trả về vị trí 1-based, null nếu không phải.
+     * "cuối/cuối cùng" -> phần tử cuối ({@code size}). Chỉ kích hoạt khi có từ khóa neo
+     * (sản phẩm/mẫu/cái/số/thứ...) đứng cạnh con số/chữ số -> tránh nhầm với ngân sách.
+     */
+    private Integer detectOrdinalReference(String message, int size) {
+        if (message == null) {
+            return null;
+        }
+        String norm = normalize(message).trim().replaceAll("\\s+", " ");
+        if (norm.isEmpty()) {
+            return null;
+        }
+
+        // 0) Cả câu chỉ là một con số: "2"
+        if (norm.matches("0*\\d{1,2}")) {
+            return Integer.parseInt(norm);
+        }
+        // 1) "cuoi" / "cuoi cung" -> phần tử cuối
+        if (size > 0 && Pattern.compile("\\bcuoi(?:\\s+cung)?\\b").matcher(norm).find()) {
+            return size;
+        }
+        // 2) "dau tien" / từ khóa neo + "dau" -> phần tử đầu
+        if (Pattern.compile("\\bdau(?:\\s+tien)?\\b").matcher(norm).find()
+                && Pattern.compile("\\b(?:san pham|sp|mau|cai|mon|chiec|cuon|loai)\\b").matcher(norm).find()) {
+            return 1;
+        }
+        // 3a) TÍN HIỆU MẠNH: "so N" / "thu N" (số 2, thứ 3) ở bất kỳ đâu trong câu
+        Matcher mStrong = Pattern.compile("\\b(?:so|thu)\\s*0*(\\d{1,2})\\b" + UNIT_LOOKAHEAD).matcher(norm);
+        if (mStrong.find()) {
+            return Integer.parseInt(mStrong.group(1));
+        }
+        // 3b) TÍN HIỆU YẾU: từ khóa neo + số Ở CUỐI câu ("sản phẩm 2", "mẫu 2", "cái 2").
+        //     Bắt buộc số ở cuối để tránh nhầm "mẫu 2 chỗ", "sofa 3 chỗ"...
+        Matcher mWeak = Pattern.compile(
+                "\\b(?:san pham|sp|mau|cai|mon|chiec|cuon|loai)\\s+0*(\\d{1,2})\\s*$").matcher(norm);
+        if (mWeak.find()) {
+            return Integer.parseInt(mWeak.group(1));
+        }
+        // 4) "thu" + chữ số thứ tự: "thứ nhất", "thứ ba", "thứ tư"... (buộc có "thứ" để tránh nhầm)
+        Matcher mWord = Pattern.compile(
+                "\\bthu\\s+(nhat|nhi|hai|ba|tu|bon|nam|sau|bay|tam|chin|muoi)\\b").matcher(norm);
+        if (mWord.find()) {
+            return ORDINAL_WORDS.get(mWord.group(1));
+        }
+        return null;
+    }
+
+    /** Dựng thẻ CHI TIẾT sản phẩm (kèm mô tả, bảng thông số, tình trạng còn hàng). */
+    private ChatProductDTO toDetailCard(Product p, Map<String, String> categoryNames) {
+        PriceInfo pi = computePrice(p);
+        String category = categoryNames.getOrDefault(safe(p.getCategoryId()), "Khác");
+        return ChatProductDTO.builder()
+                .id(p.getProductId())
+                .name(p.getProductName())
+                .price(pi.price)
+                .oldPrice(pi.oldPrice)
+                .image(resolveImageUrl(p))
+                .url("/product/" + p.getProductId())
+                .category(category)
+                .description(truncate(p.getDescription(), 400))
+                .specs(buildSpecItems(p))
+                .inStock(p.getQuantity() > 0)
+                .build();
+    }
+
+    /** Bảng thông số có cấu trúc (label/value) cho thẻ chi tiết. */
+    private List<ChatSpecDTO> buildSpecItems(Product p) {
+        List<ChatSpecDTO> specs = new ArrayList<>();
+
+        if (p.getLength() != null && p.getWidth() != null && p.getHeight() != null) {
+            specs.add(new ChatSpecDTO("Kích thước (D x R x C)",
+                    String.format("%d x %d x %d cm", p.getLength(), p.getWidth(), p.getHeight())));
+        } else if (p.getSize() != null && !p.getSize().isBlank()) {
+            specs.add(new ChatSpecDTO("Kích thước", p.getSize().trim()));
+        }
+
+        if (p.getWeight() != null && p.getWeight() > 0) {
+            if (p.getWeight() >= 1000) {
+                double kg = p.getWeight() / 1000.0;
+                String kgStr = (kg == Math.floor(kg)) ? String.valueOf((long) kg) : String.format("%.1f", kg);
+                specs.add(new ChatSpecDTO("Cân nặng", kgStr + " kg"));
+            } else {
+                specs.add(new ChatSpecDTO("Cân nặng", p.getWeight() + " g"));
+            }
+        }
+
+        if (p.getColor() != null && !p.getColor().isBlank()) {
+            specs.add(new ChatSpecDTO("Màu sắc", p.getColor().trim()));
+        }
+        if (p.getMaterial() != null && !p.getMaterial().isBlank()) {
+            specs.add(new ChatSpecDTO("Chất liệu", p.getMaterial().trim()));
+        }
+        if (p.getWarranty() != null && !p.getWarranty().isBlank()) {
+            specs.add(new ChatSpecDTO("Bảo hành", p.getWarranty().trim()));
+        }
+        if (p.getOrigin() != null && !p.getOrigin().isBlank()) {
+            specs.add(new ChatSpecDTO("Xuất xứ", p.getOrigin().trim()));
+        }
+
+        return specs;
+    }
+
+    /**
+     * Tính giá theo ĐÚNG quy ước hiển thị của cửa hàng (xem Products.jsx):
+     * - price (giá bán) = giá niêm yết * (1 - discount/100) khi có giảm giá.
+     * - oldPrice (giá gốc gạch ngang) = giá niêm yết; null khi không giảm giá.
+     */
+    private PriceInfo computePrice(Product p) {
+        BigDecimal list = p.getPrice();
+        if (list == null) {
+            return new PriceInfo(BigDecimal.ZERO, null);
+        }
+        BigDecimal discount = p.getDiscount();
+        if (discount != null
+                && discount.compareTo(BigDecimal.ZERO) > 0
+                && discount.compareTo(BigDecimal.valueOf(100)) < 0) {
+            BigDecimal factor = BigDecimal.valueOf(100).subtract(discount);
+            BigDecimal finalPrice = list.multiply(factor)
+                    .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+            return new PriceInfo(finalPrice, list);
+        }
+        return new PriceInfo(list, null);
+    }
+
+    /** Lấy URL ảnh tuyệt đối (giữ nguyên link http; ghép base cho đường dẫn tương đối). */
+    private String resolveImageUrl(Product p) {
+        String rawImg = (p.getImages() != null && !p.getImages().isEmpty())
+                ? p.getImages().get(0).getUrl()
+                : null;
+        if (rawImg == null || rawImg.isEmpty()) {
+            return "https://via.placeholder.com/300x200.png?text=No+Image";
+        }
+        if (rawImg.startsWith("http")) {
+            return rawImg;
+        }
+        String path = rawImg.startsWith("/") ? rawImg : "/" + rawImg;
+        return IMAGE_BASE_URL + path;
+    }
+
+    /** Lấy & làm sạch highlights từ JSON của AI; nếu thiếu thì suy ra từ thông số DB. */
+    private List<String> extractHighlights(JsonNode pn, Product fallbackProduct) {
+        List<String> out = new ArrayList<>();
+        JsonNode hl = pn.path("highlights");
+        if (hl.isArray()) {
+            for (JsonNode h : hl) {
+                String s = sanitizeText(h.asText(""));
+                if (s.isEmpty()) {
+                    continue;
+                }
+                if (s.length() > 60) {
+                    s = s.substring(0, 60).trim();
+                }
+                out.add(s);
+                if (out.size() >= 4) {
+                    break;
+                }
+            }
+        }
+        if (out.isEmpty()) {
+            out = fallbackHighlights(fallbackProduct);
+        }
+        return out;
+    }
+
+    /** Highlights dự phòng dựng từ thông số DB khi AI không cung cấp. */
+    private List<String> fallbackHighlights(Product p) {
+        List<String> out = new ArrayList<>();
+        if (p.getMaterial() != null && !p.getMaterial().isBlank()) {
+            out.add("Chất liệu " + p.getMaterial().trim());
+        }
+        if (p.getWarranty() != null && !p.getWarranty().isBlank()) {
+            out.add("Bảo hành " + p.getWarranty().trim());
+        }
+        if (p.getColor() != null && !p.getColor().isBlank()) {
+            out.add("Màu " + p.getColor().trim());
+        }
+        if (out.isEmpty()) {
+            out.add("Hàng có sẵn tại NPH Store");
+        }
+        return out;
+    }
+
+    /** Loại bỏ markdown/HTML khỏi văn bản do AI sinh (phòng khi AI không tuân thủ). */
+    private String sanitizeText(String s) {
+        if (s == null) {
+            return "";
+        }
+        String t = s;
+        t = t.replaceAll("!\\[[^\\]]*\\]\\([^)]*\\)", " "); // ảnh markdown ![alt](url)
+        t = t.replaceAll("\\[([^\\]]*)\\]\\([^)]*\\)", "$1"); // link markdown [text](url) -> text
+        t = t.replaceAll("<[^>]+>", " "); // thẻ HTML
+        t = t.replace("**", "").replace("__", "").replace("`", "");
+        t = t.replaceAll("(?m)^#+\\s*", ""); // tiêu đề markdown
+        t = t.replaceAll("[ \\t]+", " ");
+        t = t.replaceAll("\\s*\\n\\s*\\n\\s*", "\n"); // gộp dòng trống
+        return t.trim();
+    }
+
+    private Map<String, String> loadCategoryDisplayNames() {
+        Map<String, String> map = new HashMap<>();
+        for (Category c : categoryRepository.findAll()) {
+            if (c.getCategoryId() != null) {
+                map.put(c.getCategoryId(), safe(c.getCategoryName()));
+            }
+        }
+        return map;
+    }
+
+    /**
+     * Dựng context kho hàng để gửi cho AI. Bao gồm 'ID' (để AI tham chiếu) nhưng KHÔNG
+     * gồm link/ảnh — các trường này backend tự dựng sau khi hydrate, tránh AI tự tạo URL.
+     */
+    private String buildProductContext(List<Product> products, Map<String, String> categoryNames) {
+        if (products.isEmpty()) {
+            return "Kho đang cập nhật (không có sản phẩm phù hợp).";
+        }
+        return products.stream()
                 .map(p -> {
-                    String productLink = FRONTEND_URL + "/product/" + p.getProductId();
-
-                    // Xử lý ảnh (Tạo link tuyệt đối)
-                    String rawImg = p.getImages() != null && !p.getImages().isEmpty() ? p.getImages().get(0).getUrl()
-                            : null;
-                    String finalImgUrl;
-                    if (rawImg == null || rawImg.isEmpty()) {
-                        finalImgUrl = "https://via.placeholder.com/300x200.png?text=No+Image";
-                    } else if (rawImg.startsWith("http")) {
-                        finalImgUrl = rawImg;
-                    } else {
-                        // Đảm bảo không bị trùng dấu gạch chéo
-                        String path = rawImg.startsWith("/") ? rawImg : "/" + rawImg;
-                        finalImgUrl = IMAGE_BASE_URL + path;
-                    }
-
-                    // Xử lý Giá & Giảm giá
-                    BigDecimal currentPrice = p.getPrice(); // Giá bán hiện tại
-                    BigDecimal originalPrice = currentPrice;
-                    BigDecimal discountVal = p.getDiscount(); // Ví dụ: 15.00
-
-                    // Tính giá gốc nếu có discount
-                    if (discountVal != null && discountVal.compareTo(BigDecimal.ZERO) > 0) {
-                        BigDecimal factor = BigDecimal.valueOf(100).subtract(discountVal);
-                        if (factor.compareTo(BigDecimal.ZERO) > 0) {
-                            originalPrice = currentPrice.multiply(BigDecimal.valueOf(100))
-                                    .divide(factor, 0, RoundingMode.HALF_UP);
-                        }
-                    }
-
-                    String priceTxt = String.format("%.0f", currentPrice);
-                    String originalPriceTxt = String.format("%.0f", originalPrice);
-
-                    int quantity = p.getQuantity();
-                    String status = (quantity > 0) ? "CÒN HÀNG" : "HẾT HÀNG";
-
-                    String categoryName = p.getCategoryId() != null
-                            ? categoryDisplayNames.getOrDefault(p.getCategoryId(), "Khác")
-                            : "Khác";
-
-                    // Data gửi cho AI
+                    PriceInfo pi = computePrice(p);
+                    String priceTxt = pi.oldPrice != null
+                            ? String.format("Giá bán: %s VNĐ (giá gốc %s VNĐ)", fmt(pi.price), fmt(pi.oldPrice))
+                            : String.format("Giá bán: %s VNĐ", fmt(pi.price));
+                    String category = categoryNames.getOrDefault(safe(p.getCategoryId()), "Khác");
+                    String status = p.getQuantity() > 0 ? "CÒN HÀNG" : "HẾT HÀNG";
                     return String.format(
-                            "- Tên: %s | Danh mục: %s | Trạng thái: %s | Giá Gốc: %s | Giá Giảm: %s | Thông số: %s | Link: %s | Ảnh: %s | Mô tả: %s",
+                            "- ID: %s | Tên: %s | Danh mục: %s | Trạng thái: %s | %s | Thông số: %s | Mô tả: %s",
+                            p.getProductId(),
                             p.getProductName(),
-                            categoryName,
+                            category,
                             status,
-                            originalPriceTxt,
                             priceTxt,
                             buildProductSpecs(p),
-                            productLink,
-                            finalImgUrl,
                             truncate(p.getDescription(), 150));
                 })
                 .collect(Collectors.joining("\n"));
+    }
+
+    private String fmt(BigDecimal bd) {
+        return bd == null ? "0" : bd.setScale(0, RoundingMode.HALF_UP).toPlainString();
     }
 
     // ====================================================================
@@ -624,6 +928,17 @@ public class ChatbotServiceImpl implements ChatbotService {
         ScoredProduct(Product product, int score) {
             this.product = product;
             this.score = score;
+        }
+    }
+
+    /** Cặp giá bán / giá gốc đã tính theo quy ước hiển thị của cửa hàng. */
+    private static class PriceInfo {
+        final BigDecimal price;
+        final BigDecimal oldPrice;
+
+        PriceInfo(BigDecimal price, BigDecimal oldPrice) {
+            this.price = price;
+            this.oldPrice = oldPrice;
         }
     }
 }

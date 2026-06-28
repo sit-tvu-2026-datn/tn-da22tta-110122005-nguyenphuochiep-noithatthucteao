@@ -69,7 +69,7 @@ export default function NewsletterSection() {
         </h2>
 
         {/* Subtitle */}
-        <p className="text-white/40 font-light tracking-wide mb-10 text-sm sm:text-base max-w-md mx-auto">
+        <p className="text-white/70 font-normal tracking-wide mb-10 text-sm sm:text-base max-w-md mx-auto">
           Đăng ký nhận bản tin để cập nhật bộ sưu tập mới, ưu đãi đặc biệt và
           cảm hứng thiết kế nội thất.
         </p>
@@ -87,7 +87,7 @@ export default function NewsletterSection() {
               placeholder="Nhập email của bạn"
               required
               id="newsletter-email"
-              className="w-full bg-white/5 border border-champagne/20 text-white placeholder-white/25 text-sm font-light tracking-wide px-5 py-4 outline-none focus:border-champagne/50 transition-colors"
+              className="w-full bg-white/5 border border-champagne/20 text-white placeholder-white/40 text-sm font-normal tracking-wide px-5 py-4 outline-none focus:border-champagne/50 transition-colors"
             />
           </div>
           <button
@@ -111,7 +111,7 @@ export default function NewsletterSection() {
         </form>
 
         {/* Trust Note */}
-        <p className="text-white/20 text-[10px] font-light tracking-[0.15em] uppercase mt-6">
+        <p className="text-white/45 text-[10px] font-normal tracking-[0.15em] uppercase mt-6">
           Không spam · Hủy đăng ký bất cứ lúc nào
         </p>
       </motion.div>

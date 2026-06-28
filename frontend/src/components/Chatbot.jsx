@@ -5,14 +5,23 @@ import {
   Send,
   Loader2,
   ShoppingBag,
-  ExternalLink,
-  ChevronRight,
   RefreshCw,
   Armchair,
   Maximize2,
   Minimize2,
 } from "lucide-react";
 import api from "../config/api";
+import MessageRenderer from "./chat/MessageRenderer";
+
+const STORAGE_KEY = "chat_history_v2";
+
+const GREETING = {
+  id: 1,
+  type: "text",
+  message:
+    "Xin chào! Tôi là trợ lý ảo NPH Store. Tôi có thể giúp bạn tìm Sofa, Bàn ăn... hoặc tư vấn thiết kế ngay lập tức!",
+  sender: "bot",
+};
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -23,24 +32,16 @@ export default function Chatbot() {
 
   const [messages, setMessages] = useState(() => {
     try {
-      const savedMessages = sessionStorage.getItem("chat_history");
-      return savedMessages
-        ? JSON.parse(savedMessages)
-        : [
-            {
-              id: 1,
-              text: "Xin chào! Tôi là trợ lý ảo NPH Store. Tôi có thể giúp bạn tìm Sofa, Bàn ăn... hoặc tư vấn thiết kế ngay lập tức!",
-              sender: "bot",
-            },
-          ];
+      const savedMessages = sessionStorage.getItem(STORAGE_KEY);
+      return savedMessages ? JSON.parse(savedMessages) : [GREETING];
     } catch (error) {
       console.error("Lỗi đọc lịch sử chat:", error);
-      return [];
+      return [GREETING];
     }
   });
 
   useEffect(() => {
-    sessionStorage.setItem("chat_history", JSON.stringify(messages));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
     scrollToBottom();
   }, [messages, isOpen]);
 
@@ -50,11 +51,13 @@ export default function Chatbot() {
 
   const handleClearChat = () => {
     if (window.confirm("Bạn có chắc muốn xóa toàn bộ lịch sử chat không?")) {
-      sessionStorage.removeItem("chat_history");
+      sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem("chat_history"); // dọn key cũ (phiên bản text)
       setMessages([
         {
           id: Date.now(),
-          text: "Đoạn chat đã được làm mới. Bạn cần tìm nội thất gì?",
+          type: "text",
+          message: "Đoạn chat đã được làm mới. Bạn cần tìm nội thất gì?",
           sender: "bot",
         },
       ]);
@@ -74,35 +77,57 @@ export default function Chatbot() {
     setInputMsg("");
     setIsTyping(true);
 
-    // 2. LOGIC MEMORY: Lọc lấy 5 cặp hội thoại gần nhất (10 tin nhắn)
-    // Lấy messages hiện tại (lọc bỏ lỗi)
+    // 2. LOGIC MEMORY: Lấy 10 tin nhắn hợp lệ gần nhất làm ngữ cảnh
     const validMessages = messages.filter((msg) => !msg.isError);
-    // Cắt lấy 10 tin nhắn cuối cùng (để gửi kèm tin nhắn mới)
     const historySlice = validMessages.slice(-10);
 
-    // Map sang format API yêu cầu
+    // Map sang format API yêu cầu. Bot lưu nội dung ở `message`, user ở `text`.
     const historyPayload = historySlice.map((msg) => ({
       role: msg.sender === "user" ? "user" : "assistant",
-      content: msg.text,
+      content:
+        msg.sender === "user" ? msg.text || "" : msg.message ?? msg.text ?? "",
     }));
+
+    // Ngữ cảnh tham chiếu: ID sản phẩm (đúng thứ tự) của lần GỢI Ý gần nhất,
+    // để backend map "sản phẩm số 2", "mẫu thứ 3"... -> đúng sản phẩm.
+    const lastRecommendation = [...messages]
+      .reverse()
+      .find(
+        (msg) =>
+          msg.sender === "bot" &&
+          msg.type === "product_recommendation" &&
+          Array.isArray(msg.products) &&
+          msg.products.length > 0,
+      );
+    const lastRecommendedProductIds = lastRecommendation
+      ? lastRecommendation.products.map((p) => p.id).filter(Boolean)
+      : [];
 
     try {
       const { data } = await api.post("/api/chatbot/ask", {
         message: apiMsg,
-        history: historyPayload, // Gửi kèm lịch sử
+        history: historyPayload,
+        lastRecommendedProductIds,
       });
 
       setMessages((prev) => [
         ...prev,
-        { id: Date.now() + 1, text: data.reply, sender: "bot" },
+        {
+          id: Date.now() + 1,
+          sender: "bot",
+          type: data?.type || "text",
+          message: data?.message ?? "",
+          products: data?.products || [],
+        },
       ]);
     } catch {
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 1,
-          text: "Xin lỗi, hiện tại máy chủ đang bận. Vui lòng thử lại sau.",
           sender: "bot",
+          type: "text",
+          message: "Xin lỗi, hiện tại máy chủ đang bận. Vui lòng thử lại sau.",
           isError: true,
         },
       ]);
@@ -111,148 +136,45 @@ export default function Chatbot() {
     }
   };
 
-  // --- COMPONENT CON: THẺ SẢN PHẨM ---
-  const MiniProductCard = ({ name, url, imgUrl, priceString }) => {
-    let oldPriceStr = "";
-    let newPriceStr = priceString || "";
+  const BotAvatar = () => (
+    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-2 text-blue-600 shrink-0 border border-blue-200 self-end mb-1">
+      <ShoppingBag size={14} />
+    </div>
+  );
 
-    if (priceString && priceString.includes("|")) {
-      const parts = priceString.split("|");
-      oldPriceStr = parts[0]?.trim() || "";
-      newPriceStr = parts[1]?.trim() || "";
-    }
-
-    const formatPrice = (price) => {
-      if (!price || price === "0") return "";
-      const num = parseInt(price.toString().replace(/\D/g, "")) || 0;
-      if (num === 0) return "Liên hệ";
-      return num.toLocaleString("vi-VN") + "đ";
-    };
-
-    let discountPercent = 0;
-    if (oldPriceStr && newPriceStr) {
-      const oldP = parseInt(oldPriceStr.replace(/\D/g, ""));
-      const newP = parseInt(newPriceStr.replace(/\D/g, ""));
-      if (oldP > newP && oldP > 0) {
-        discountPercent = Math.round(((oldP - newP) / oldP) * 100);
-      }
-    }
-
-    return (
-      <div className="mt-2 mb-3 group relative block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-all duration-300 w-full max-w-[260px]">
-        <a href={url} target="_blank" rel="noopener noreferrer" className="block relative h-40 w-full overflow-hidden bg-gray-50">
-          <img
-            src={imgUrl}
-            alt={name}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-            onError={(e) => {
-              e.target.src = "https://via.placeholder.com/300x200?text=NPH+Store";
-            }}
-          />
-          {discountPercent > 0 && (
-            <div className="absolute top-0 right-0 bg-red-600 text-white text-[11px] font-bold px-2 py-1 rounded-bl-lg shadow-sm z-10">
-              -{discountPercent}%
-            </div>
-          )}
-        </a>
-
-        <div className="p-3">
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <h4 className="text-[13px] font-semibold text-gray-800 line-clamp-2 leading-snug mb-2 min-h-[2.5em] hover:text-blue-600 transition-colors">
-              {name}
-            </h4>
-          </a>
-
-          <div className="flex items-end justify-between mt-1">
-            <div className="flex flex-col">
-              <span className="text-red-600 font-bold text-[15px] leading-none">
-                {formatPrice(newPriceStr)}
-              </span>
-              {discountPercent > 0 && (
-                <span className="text-[11px] text-gray-400 line-through mt-1">
-                  {formatPrice(oldPriceStr)}
-                </span>
-              )}
-            </div>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-            >
-              <ChevronRight size={18} />
-            </a>
+  const renderMessage = (msg) => {
+    // Tin nhắn của người dùng
+    if (msg.sender === "user") {
+      return (
+        <div key={msg.id} className="flex w-full justify-end">
+          <div className="max-w-[85%] p-3.5 text-[14px] shadow-sm leading-relaxed bg-blue-600 text-white rounded-2xl rounded-br-sm break-words">
+            {msg.text}
           </div>
+        </div>
+      );
+    }
+
+    // Tin nhắn lỗi từ bot
+    if (msg.isError) {
+      return (
+        <div key={msg.id} className="flex w-full justify-start">
+          <BotAvatar />
+          <div className="max-w-[85%] p-3.5 text-[14px] shadow-sm leading-relaxed rounded-2xl rounded-bl-sm border border-red-200 bg-red-50 text-red-600 break-words">
+            {msg.message ?? msg.text}
+          </div>
+        </div>
+      );
+    }
+
+    // Tin nhắn bot bình thường -> render theo type (text | product_recommendation)
+    return (
+      <div key={msg.id} className="flex w-full justify-start">
+        <BotAvatar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <MessageRenderer message={msg} onNavigate={() => setIsOpen(false)} />
         </div>
       </div>
     );
-  };
-
-  // --- XỬ LÝ TEXT & FORMATTING ---
-  const formatMessage = (text) => {
-    if (!text) return null;
-    const cleanText = text.replace(/\*\*/g, ""); 
-    const parts = [];
-    let lastIndex = 0;
-    const productRegex = /\[([^\]]+)\]\(([^)]+)\)[\s\n]*!\[([^\]]*)\]\(([^)]+)\)/g;
-
-    let match;
-    while ((match = productRegex.exec(cleanText)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(renderTextWithLines(cleanText.substring(lastIndex, match.index)));
-      }
-      parts.push(
-        <MiniProductCard
-          key={`prod-${match.index}`}
-          name={match[1]}
-          url={match[2]}
-          priceString={match[3]}
-          imgUrl={match[4]}
-        />
-      );
-      lastIndex = productRegex.lastIndex;
-    }
-    if (lastIndex < cleanText.length) {
-      parts.push(renderTextWithLines(cleanText.substring(lastIndex)));
-    }
-    return parts;
-  };
-
-  const renderTextWithLines = (text) => {
-    return text.split("\n").map((line, index) => {
-      if (!line.trim() && index > 0) return <div key={index} className="h-2" />;
-      if (!line.trim()) return null;
-      return (
-        <div key={index} className="mb-1 leading-relaxed text-gray-700 text-[14px]">
-          {formatSimpleLinks(line)}
-        </div>
-      );
-    });
-  };
-
-  const formatSimpleLinks = (text) => {
-    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-    const fragments = [];
-    let lastIdx = 0;
-    let match;
-    while ((match = linkRegex.exec(text)) !== null) {
-      if (match.index > lastIdx)
-        fragments.push(text.substring(lastIdx, match.index));
-      fragments.push(
-        <a
-          key={`link-${match.index}`}
-          href={match[2]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 font-medium hover:underline inline-flex items-center gap-0.5"
-        >
-          {match[1]} <ExternalLink size={10} />
-        </a>
-      );
-      lastIdx = linkRegex.lastIndex;
-    }
-    if (lastIdx < text.length) fragments.push(text.substring(lastIdx));
-    return fragments;
   };
 
   return (
@@ -282,16 +204,7 @@ export default function Chatbot() {
           </div>
 
           <div className="flex-1 p-4 overflow-y-auto bg-[#f0f2f5] space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-            {messages.map((msg) => (
-              <div key={msg.id} className={`flex w-full ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
-                {msg.sender === "bot" && (
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-2 text-blue-600 shrink-0 border border-blue-200 self-end mb-1"><ShoppingBag size={14} /></div>
-                )}
-                <div className={`max-w-[85%] p-3.5 text-[14px] shadow-sm leading-relaxed ${msg.sender === "user" ? "bg-blue-600 text-white rounded-2xl rounded-br-sm" : "bg-white text-gray-800 border border-gray-200 rounded-2xl rounded-bl-sm"} ${msg.isError ? "border-red-200 bg-red-50 text-red-600" : ""}`}>
-                  {msg.sender === "bot" && !msg.isError ? <div className="break-words">{formatMessage(msg.text)}</div> : msg.text}
-                </div>
-              </div>
-            ))}
+            {messages.map((msg) => renderMessage(msg))}
             {isTyping && (
               <div className="flex justify-start items-center">
                 <div className="w-8 h-8 rounded-full bg-gray-200/50 flex items-center justify-center mr-2 opacity-50 self-end mb-1"><ShoppingBag size={14} className="text-gray-500" /></div>

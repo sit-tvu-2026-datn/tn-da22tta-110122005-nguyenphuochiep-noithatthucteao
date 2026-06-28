@@ -19,7 +19,7 @@ const DEFAULT_AVATAR =
 
 // Style helpers — hairline input shared with the login page
 const labelCls =
-  "font-roboto text-[11px] font-semibold uppercase tracking-[0.2em] text-smoke";
+  "font-sans text-[11px] font-semibold uppercase tracking-[0.2em] text-smoke";
 const inputCls = (error) =>
   `peer w-full border-0 border-b bg-transparent pb-2.5 text-[15px] text-nero placeholder-smoke/40 transition-colors focus:outline-none disabled:opacity-50 ${error
     ? "border-red-400 focus:border-red-500"
@@ -214,7 +214,7 @@ export default function Register() {
     : { initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 } };
 
   return (
-    <div className="min-h-screen flex bg-ivory font-roboto text-nero">
+    <div className="min-h-screen flex bg-ivory font-sans text-nero">
       {contextHolder}
 
       {/* ─────────────────────────────────────────────
@@ -240,26 +240,18 @@ export default function Register() {
         {/* Brand mark */}
         <Link
           to="/"
-          className="absolute top-10 left-12 z-10 font-roboto text-4xl font-extrabold uppercase tracking-tight text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/60 focus-visible:ring-offset-4 focus-visible:ring-offset-nero"
+          className="absolute top-10 left-12 z-10 font-sans text-4xl font-extrabold uppercase tracking-tight text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/60 focus-visible:ring-offset-4 focus-visible:ring-offset-nero"
         >
           NPH <span className="text-champagne">Store</span>
         </Link>
 
         {/* Editorial copy */}
         <div className="relative z-10 mt-auto p-12 xl:p-16 max-w-xl">
-          <div className="mb-6 flex items-center gap-3">
-            <span className="inline-block h-px w-8 bg-champagne" />
-            <span className="font-roboto text-[11px] font-semibold uppercase tracking-[0.3em] text-champagne">
-              Thành viên mới
-            </span>
-          </div>
           <p
-            className="font-roboto font-extrabold uppercase leading-[1.1] tracking-tight text-white"
+            className="font-sans font-extrabold uppercase leading-[1.1] tracking-tight text-white"
             style={{ fontSize: "clamp(1.75rem, 3vw, 2.75rem)" }}
           >
-            Gia nhập cộng đồng
-            <br />
-            những người yêu
+            Sống cùng
             <br />
             <span className="text-champagne">không gian đẹp</span>
           </p>
@@ -277,7 +269,7 @@ export default function Register() {
         <div className="flex items-center justify-between">
           <Link
             to="/"
-            className="font-roboto text-lg font-extrabold uppercase tracking-tight text-nero lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory"
+            className="font-sans text-lg font-extrabold uppercase tracking-tight text-nero lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory"
           >
             NPH <span className="text-champagne">Store</span>
           </Link>
@@ -303,12 +295,12 @@ export default function Register() {
           <div className="mb-9">
             <div className="mb-4 flex items-center gap-3">
               <span className="inline-block h-px w-8 bg-champagne" />
-              <span className="font-roboto text-[11px] font-semibold uppercase tracking-[0.3em] text-champagne">
+              <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.3em] text-champagne">
                 Đăng ký
               </span>
             </div>
             <h1
-              className="font-roboto font-extrabold uppercase leading-[1.05] tracking-tight text-nero"
+              className="font-sans font-extrabold uppercase leading-[1.05] tracking-tight text-nero"
               style={{ fontSize: "clamp(2rem, 4vw, 2.75rem)" }}
             >
               Tạo tài khoản
@@ -593,7 +585,7 @@ export default function Register() {
             <button
               type="submit"
               disabled={loading || !isFormValid}
-              className="group relative flex w-full items-center justify-center gap-2.5 bg-champagne py-4 font-roboto text-xs font-bold uppercase tracking-[0.18em] text-nero transition-all duration-500 hover:shadow-[0_0_40px_rgba(200,169,110,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nero focus-visible:ring-offset-2 focus-visible:ring-offset-ivory disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+              className="group relative flex w-full items-center justify-center gap-2.5 bg-champagne py-4 font-sans text-xs font-bold uppercase tracking-[0.18em] text-nero transition-all duration-500 hover:shadow-[0_0_40px_rgba(200,169,110,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nero focus-visible:ring-offset-2 focus-visible:ring-offset-ivory disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
             >
               {loading ? (
                 <>
