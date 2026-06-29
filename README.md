@@ -1,6 +1,11 @@
-# 🛋️ NPH Store - Interior Shop
+# XÂY DỰNG HỆ THỐNG BÁN NỘI THẤT KẾT HỢP HỖ TRỢ TRẢI NGHIỆM THỰC TẾ ẢO VÀ TƯ VẤN TỰ ĐỘNG
 
-NPH Store - Interior Shop là dự án website thương mại điện tử nội thất gồm frontend React/Vite và backend Spring Boot. Dự án hỗ trợ mua sắm sản phẩm nội thất, giỏ hàng, thanh toán, quản trị cửa hàng, upload hình ảnh/model 3D, chatbot tư vấn nội thất và hệ thống gợi ý sản phẩm.
+Thông tin  
+Loại: Đồ án tốt nghiệp khoá 2022  
+Giảng viên hướng dẫn: ThS. Phạm Minh Đương  
+Sinh viên thực hiện: Nguyễn Phước Hiệp - 110122005 - DA22TTA  
+Email: nphhiep1301@gmail.com  
+
 # 🧰 Tech Stack
 | Công nghệ |
 | --- |
