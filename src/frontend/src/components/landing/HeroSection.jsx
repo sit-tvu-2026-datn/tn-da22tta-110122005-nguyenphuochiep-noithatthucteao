@@ -48,7 +48,7 @@ export default function HeroSection() {
         >
           <span className="inline-block w-8 h-px bg-champagne" />
           <span className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-champagne">
-            Bộ sưu tập 2025
+            Bộ sưu tập 2026
           </span>
           <span className="inline-block w-8 h-px bg-champagne" />
         </motion.div>
