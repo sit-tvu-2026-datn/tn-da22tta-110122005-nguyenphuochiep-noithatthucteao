@@ -217,4 +217,3 @@ npm run dev
 | Backend | `http://localhost:8080` |
 | API base | `http://localhost:8080/api` |
 | Google OAuth2 start | `http://localhost:8080/oauth2/authorization/google` |
-
