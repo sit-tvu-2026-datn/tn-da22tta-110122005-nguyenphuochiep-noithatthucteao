@@ -11,12 +11,12 @@ import {
   Typography,
   Tag,
   Divider,
+  Image,
 } from "antd";
 import {
   SearchOutlined,
   ReloadOutlined,
   EyeOutlined,
-  ShoppingCartOutlined,
   CreditCardOutlined,
   ClockCircleOutlined,
   SyncOutlined,
@@ -27,11 +27,26 @@ import {
   DollarCircleOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
-import Cookies from "js-cookie";
+import { ShoppingCart } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import api from "../../config/api";
 
 const { Title, Text } = Typography;
+
+const NO_IMAGE_FALLBACK =
+  "data:image/svg+xml;charset=UTF-8," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+      <rect width="64" height="64" fill="#f0f0f0"/>
+      <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#999" font-size="9" font-family="sans-serif">No Img</text>
+    </svg>`,
+  );
+
+const getProductImageSrc = (product) =>
+  product?.imageUrls?.[0] ||
+  product?.imageUrl ||
+  product?.images?.[0]?.url ||
+  NO_IMAGE_FALLBACK;
 
 export default function OrderManager() {
   const [orders, setOrders] = useState([]);
@@ -46,7 +61,6 @@ export default function OrderManager() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
 
-  const token = Cookies.get("jwt");
   const { user } = useContext(AuthContext);
 
   const statusOptions = [
@@ -192,8 +206,10 @@ export default function OrderManager() {
     setLoading(true);
     try {
       const res = await api.get("/api/orders");
-      const data = res.data;      
-      setOrders(data.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate)));
+      const data = res.data;
+      setOrders(
+        data.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate)),
+      );
     } catch (err) {
       console.error("API Error:", err);
       messageApi.error("Không thể tải danh sách đơn hàng");
@@ -206,12 +222,12 @@ export default function OrderManager() {
     try {
       setLoading(true);
       await api.put(`/api/orders/${orderId}/status`, newStatus, {
-        headers: { "Content-Type": "text/plain" }
+        headers: { "Content-Type": "text/plain" },
       });
       setOrders((prev) =>
         prev.map((o) =>
-          o.orderId === orderId ? { ...o, orderStatus: newStatus } : o
-        )
+          o.orderId === orderId ? { ...o, orderStatus: newStatus } : o,
+        ),
       );
       messageApi.success("Cập nhật trạng thái thành công!");
     } catch (err) {
@@ -224,7 +240,9 @@ export default function OrderManager() {
 
   const updatePaymentStatus = async (paymentId, newStatus) => {
     try {
-      await api.put(`/api/payments/${paymentId}/status`, { paymentStatus: newStatus });
+      await api.put(`/api/payments/${paymentId}/status`, {
+        paymentStatus: newStatus,
+      });
       messageApi.success("Cập nhật thanh toán thành công!");
       setOrders((prev) =>
         prev.map((order) =>
@@ -233,8 +251,8 @@ export default function OrderManager() {
                 ...order,
                 payment: { ...order.payment, paymentStatus: newStatus },
               }
-            : order
-        )
+            : order,
+        ),
       );
     } catch (err) {
       console.error("API Error:", err);
@@ -246,30 +264,25 @@ export default function OrderManager() {
     {
       title: "Đơn hàng",
       width: 250,
-      render: (_, record) => (
-        <div className="flex gap-3 items-center">
-          {record.orderDetails?.[0]?.product?.imageUrls?.[0] || record.orderDetails?.[0]?.product?.imageUrl ? (
-            <Image
-              src={record.orderDetails[0].product.imageUrls?.[0] || record.orderDetails[0].product.imageUrl}
-              className="w-12 h-12 rounded border object-cover"
-              alt="product"
-            />
-          ) : (
-            <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center border">
-              <ShoppingCartOutlined />
+      render: (_, record) => {
+        return (
+          <div className="flex gap-3 items-center">
+            <div className="w-12 h-12 rounded border bg-gray-100 flex items-center justify-center">
+              <ShoppingCart className="w-6 h-6 text-gray-500" />
             </div>
-          )}
-          <div className="flex flex-col">
-            <span className="font-mono text-xs text-gray-500">
-              {record.orderId}
-            </span>
-            <span className="font-medium text-gray-800">
-              {new Date(record.orderDate).toLocaleDateString("vi-VN")}
-            </span>
-            <span className="text-[10px] text-gray-400">{record.userId}</span>
+
+            <div className="flex flex-col">
+              <span className="font-mono text-xs text-gray-500">
+                {record.orderId}
+              </span>
+              <span className="font-medium text-gray-800">
+                {new Date(record.orderDate).toLocaleDateString("vi-VN")}
+              </span>
+              <span className="text-[10px] text-gray-400">{record.userId}</span>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: "Phương thức",
@@ -319,7 +332,7 @@ export default function OrderManager() {
       render: (s, record) => {
         const currentVal =
           statusOptions.find(
-            (opt) => opt.value.toLowerCase() === (s || "").toLowerCase()
+            (opt) => opt.value.toLowerCase() === (s || "").toLowerCase(),
           )?.value || s;
         const config = getOrderStatusConfig(currentVal);
         return (
@@ -592,10 +605,13 @@ export default function OrderManager() {
                   key={d.orderDetailId}
                   className="flex gap-4 items-center bg-white border p-2 rounded hover:shadow-sm transition"
                 >
-                  <img
-                    src={d.product?.imageUrls?.[0] || d.product?.imageUrl}
+                  <Image
+                    src={getProductImageSrc(d.product)}
                     alt="product"
-                    className="w-16 h-16 object-cover rounded bg-gray-100"
+                    width={64}
+                    height={64}
+                    className="object-cover rounded bg-gray-100"
+                    fallback={NO_IMAGE_FALLBACK}
                   />
                   <div className="flex-1">
                     <p className="font-medium text-gray-800 m-0">
@@ -631,9 +647,9 @@ export default function OrderManager() {
                         detailOrder.payment?.paymentStatus === "COMPLETED"
                           ? "green"
                           : detailOrder.payment?.paymentStatus ===
-                            "REFUND_PENDING"
-                          ? "purple"
-                          : "default"
+                              "REFUND_PENDING"
+                            ? "purple"
+                            : "default"
                       }
                     >
                       {detailOrder.payment?.paymentStatus || "COD"}
@@ -655,7 +671,9 @@ export default function OrderManager() {
               <div className="text-right">
                 {detailOrder.shippingFee != null && (
                   <div className="mb-1">
-                    <Text type="secondary" className="text-xs">Phí vận chuyển</Text>
+                    <Text type="secondary" className="text-xs">
+                      Phí vận chuyển
+                    </Text>
                     <div className="text-sm font-medium text-gray-700">
                       {Number(detailOrder.shippingFee).toLocaleString()} ₫
                     </div>

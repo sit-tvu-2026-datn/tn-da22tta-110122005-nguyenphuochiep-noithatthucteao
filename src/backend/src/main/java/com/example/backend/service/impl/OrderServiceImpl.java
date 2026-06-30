@@ -50,8 +50,11 @@ public class OrderServiceImpl implements OrderService {
 
 
     @Override
-    public List<Order> getAllOrders() {
-        return orderRepository.findByIsOrderTrue();
+    @Transactional(readOnly = true)
+    public List<OrderDTO> getAllOrders() {
+        return orderRepository.findByIsOrderTrue().stream()
+                .map(OrderDTO::new)
+                .collect(Collectors.toList());
     }
 
     @Override

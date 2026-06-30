@@ -8,6 +8,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import api from "../../config/api";
 
 const LUXURY_EASE = [0.22, 1, 0.36, 1];
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const GOOGLE_LOGIN_URL = `${API_BASE_URL}/oauth2/authorization/google`;
 
 export default function Login() {
   const location = useLocation();
@@ -407,7 +409,7 @@ export default function Login() {
 
               {/* Google */}
               <a
-                href="/oauth2/authorization/google"
+                href={GOOGLE_LOGIN_URL}
                 className="flex w-full items-center justify-center gap-3 border border-whisper bg-white py-3.5 text-sm font-medium text-nero transition-colors hover:border-smoke/50 hover:bg-ivory focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">

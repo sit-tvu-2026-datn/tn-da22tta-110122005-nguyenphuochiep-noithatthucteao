@@ -6,7 +6,7 @@ import com.example.backend.DTO.OrderReplaceRequest;
 import java.util.List;
 
 public interface OrderService {
-    List<Order> getAllOrders();
+    List<OrderDTO> getAllOrders();
     Order getOrderById(String orderId);
     //List<Order> getOrdersByUser(String userId);
     List<OrderDTO> getOrdersByUserId(String userId);

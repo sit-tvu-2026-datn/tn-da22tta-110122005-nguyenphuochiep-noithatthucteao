@@ -88,7 +88,7 @@ File mẫu: `frontend/.env.example`.
 
 | Variable | Description |
 | --- | --- |
-| `VITE_API_BASE_URL` | Base URL backend. Khi chạy dev với Vite proxy có thể để rỗng. Nếu backend chạy domain riêng, đặt ví dụ `http://localhost:8080` hoặc domain API. |
+| `VITE_API_BASE_URL` | Base URL backend. Khi chạy dev với Vite proxy có thể để rỗng. Nếu backend chạy domain riêng, đặt ví dụ `http://localhost:8080` hoặc domain API. Biến này cũng dùng để mở luồng Google OAuth2 từ frontend. |
 | `VITE_PAYPAL_CLIENT_ID` | PayPal Client ID dùng cho PayPal button ở frontend. |
 
 ## Backend `.env`
@@ -103,6 +103,7 @@ Lưu ý: `backend/src/main/resources/application.properties` yêu cầu nhiều 
 | `SPRING_DATASOURCE_PASSWORD` | Password MySQL. |
 | `SERVER_PORT` | Port backend, thường dùng `8080`. |
 | `APP_CORS_ALLOWED_ORIGINS` | Origin frontend được phép gọi API, ví dụ `http://localhost:5173`. |
+| `APP_OAUTH2_REDIRECT_URI` | URL frontend nhận JWT sau khi Google login thành công, ví dụ `http://localhost:5173/login/success` hoặc `https://your-frontend.com/login/success`. |
 | `OPENAI_API_KEY` | API key cho chatbot. |
 | `OPENAI_MODEL` | Model chatbot. |
 | `OPENAI_API_URL` | URL API chat completions tương thích OpenAI. |
@@ -137,6 +138,7 @@ Lưu ý: `backend/src/main/resources/application.properties` yêu cầu nhiều 
 | `GHN_RETRY_ATTEMPTS` | Số lần retry khi gọi GHN. |
 | `GOOGLE_CLIENT_ID` | Google OAuth2 client ID. |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret. |
+| `GOOGLE_REDIRECT_URI` | Callback URL Google gọi về backend. Local có thể để mặc định `{baseUrl}/login/oauth2/code/{registrationId}`; production nên đặt URL tuyệt đối như `https://api.your-domain.com/login/oauth2/code/google`. |
 
 Ví dụ backend `.env` tối thiểu để khởi động local:
 
@@ -146,6 +148,7 @@ SPRING_DATASOURCE_USERNAME=root
 SPRING_DATASOURCE_PASSWORD=your-password
 SERVER_PORT=8080
 APP_CORS_ALLOWED_ORIGINS=http://localhost:5173
+APP_OAUTH2_REDIRECT_URI=http://localhost:5173/login/success
 
 OPENAI_API_KEY=your-openai-api-key
 OPENAI_MODEL=your-model
@@ -187,7 +190,10 @@ GHN_RETRY_ATTEMPTS=2
 
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI={baseUrl}/login/oauth2/code/{registrationId}
 ```
+
+Khi deploy Google OAuth2, trong Google Cloud Console cần thêm Authorized redirect URI trùng với callback backend, ví dụ `https://api.your-domain.com/login/oauth2/code/google`. Nếu frontend và backend khác domain, đặt `VITE_API_BASE_URL=https://api.your-domain.com`, `APP_CORS_ALLOWED_ORIGINS=https://your-frontend.com`, và `APP_OAUTH2_REDIRECT_URI=https://your-frontend.com/login/success`.
 
 ---
 
