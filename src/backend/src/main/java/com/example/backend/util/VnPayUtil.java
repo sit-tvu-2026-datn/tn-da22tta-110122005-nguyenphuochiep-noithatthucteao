@@ -26,7 +26,7 @@ public class VnPayUtil {
             if (entry.getValue() != null && !entry.getValue().isEmpty()) {
                 sb.append(entry.getKey())
                         .append("=")
-                        .append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8))
+                        .append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8).replace("+", "%20"))
                         .append("&");
             }
         }
