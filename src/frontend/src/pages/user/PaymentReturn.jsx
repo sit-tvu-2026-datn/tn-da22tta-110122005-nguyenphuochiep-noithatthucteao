@@ -39,7 +39,7 @@ export default function PaymentReturn() {
 
     if (!responseCode) {
       messageApi.error("Không tìm thấy dữ liệu giao dịch!");
-      setTimeout(() => navigate("/checkout"), 3000); // Quay về checkout nếu lỗi
+      setTimeout(() => navigate("/cart"), 3000); // Quay về giỏ hàng nếu lỗi
       return;
     }
 
@@ -47,8 +47,8 @@ export default function PaymentReturn() {
       try {
         if (responseCode !== "00") {
           messageApi.error("Thanh toán thất bại!");
-          setLoadingMessage("Thanh toán thất bại! Quay về checkout...");
-          setTimeout(() => navigate("/checkout"), 3000);
+          setLoadingMessage("Thanh toán thất bại! Quay về giỏ hàng...");
+          setTimeout(() => navigate("/cart"), 3000);
           return;
         }
 
@@ -97,7 +97,7 @@ export default function PaymentReturn() {
         console.error(err);
         messageApi.error(`Lỗi: ${err.message}`);
         setLoadingMessage("Lỗi xử lý! Vui lòng liên hệ CSKH hoặc thử lại.");
-        // Không navigate về checkout ngay để user đọc lỗi, hoặc tùy logic của bạn
+        // Không navigate về giỏ hàng ngay để user đọc lỗi, hoặc tùy logic của bạn
       }
     };
 

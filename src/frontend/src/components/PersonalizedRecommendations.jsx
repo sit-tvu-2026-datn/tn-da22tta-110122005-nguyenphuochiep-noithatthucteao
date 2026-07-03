@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronRight, ShoppingBag, Sparkles, UserCheck } from "lucide-react";
+import { ShoppingBag, Sparkles, UserCheck } from "lucide-react";
 import Cookies from "js-cookie";
 import { message } from "antd";
 import api from "../config/api";
@@ -38,8 +38,7 @@ function resolveImage(product) {
  */
 export default function PersonalizedRecommendations() {
   const [recommendations, setRecommendations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [apiMessage, setApiMessage] = useState("");
+  const [loading, setLoading] = useState(false);
   const [recType, setRecType] = useState("");
   
   const navigate = useNavigate();
@@ -48,6 +47,13 @@ export default function PersonalizedRecommendations() {
   const token = Cookies.get("jwt");
 
   useEffect(() => {
+    if (!token || !userId) {
+      setRecommendations([]);
+      setRecType("");
+      setLoading(false);
+      return;
+    }
+
     const fetchRecommendations = async () => {
       setLoading(true);
       try {
@@ -65,16 +71,9 @@ export default function PersonalizedRecommendations() {
           }
         }
 
-        // Nếu chưa đăng nhập hoặc không lấy được gợi ý cá nhân hóa, lấy sản phẩm phổ biến làm fallback
-        if (!responseData) {
-          const res = await api.get("/api/recommend/popular?limit=4");
-          responseData = res.data;
-        }
-
         if (responseData) {
           setRecommendations(responseData.recommendations || []);
-          setApiMessage(responseData.message || "Gợi ý hàng đầu dành cho bạn");
-          setRecType(responseData.recommendationType || "POPULAR");
+          setRecType(responseData.recommendationType || "FOR_YOU");
         }
       } catch (error) {
         console.error("Lỗi khi tải gợi ý cá nhân hóa:", error);

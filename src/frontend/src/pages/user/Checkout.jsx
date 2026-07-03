@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState, useEffect, useContext, useMemo, useRef } from "react"; // [UPDATE] Thêm useContext
+import { useState, useEffect, useContext, useMemo } from "react"; // [UPDATE] Thêm useContext
 import { message, Modal, Input, Divider, Button, Select } from "antd";
 import {
   MapPin,
@@ -22,21 +22,12 @@ import { AuthContext } from "../../context/AuthContext"; // [UPDATE] Import Auth
 import api from "../../config/api";
 import PayPalButton from "../../components/PayPalButton"; // [PAYPAL] Nút thanh toán PayPal tái sử dụng
 import {
-  calculateShippingFee,
-  extractGhnError,
-  getAvailableServices,
   getDistricts,
   getProvinces,
   getWards,
-  isGhnRequestCanceled,
 } from "../../services/ghnService";
 
-const SHIPPING_DEBOUNCE_MS = 500;
-const DEFAULT_PACKAGE_SIZE = {
-  height: 20,
-  length: 20,
-  width: 20,
-};
+const FREE_SHIPPING_FEE = 0;
 
 // --- HÀM KIỂM TRA HẠN SỬ DỤNG ---
 const isCouponExpired = (endDate) => {
@@ -91,13 +82,7 @@ export default function Checkout() {
     districts: false,
     wards: false,
   });
-  const [shippingFee, setShippingFee] = useState(0);
-  const [shippingService, setShippingService] = useState(null);
-  const [shippingLoading, setShippingLoading] = useState(false);
-  const [shippingError, setShippingError] = useState("");
-  const shippingRequestRef = useRef(0);
-  const [isFreeShipping, setIsFreeShipping] = useState(false);
-  const [freeShippingReason, setFreeShippingReason] = useState("");
+  const shippingFee = FREE_SHIPPING_FEE;
 
   const [singleProduct, setSingleProduct] = useState(state?.product || null);
   const [items, setItems] = useState(state?.order?.orderDetails || []);
@@ -257,125 +242,12 @@ export default function Checkout() {
     () => addresses.find((a) => a.id === selectedAddressId),
     [addresses, selectedAddressId]
   );
-  const totalQuantity = productsToPay.reduce(
-    (sum, item) => sum + Number(item.quantity || 0),
-    0
-  );
-  const packageWeight = Math.max(1000, totalQuantity * 1000);
-  const insuranceValue = Math.max(
-    0,
-    Math.min(Math.round(totalPriceWithCoupon), 5000000)
-  );
   const grandTotal = totalPriceWithCoupon + shippingFee;
   const isAddressReady = Boolean(
     selectedAddress?.provinceId &&
       selectedAddress?.districtId &&
       selectedAddress?.wardCode
   );
-
-  useEffect(() => {
-    if (!selectedAddress) {
-      setShippingFee(0);
-      setShippingService(null);
-      setShippingError("");
-      setShippingLoading(false);
-      setIsFreeShipping(false);
-      setFreeShippingReason("");
-      return undefined;
-    }
-
-    if (!isAddressReady) {
-      setShippingFee(0);
-      setShippingService(null);
-      setShippingError("Vui lòng chọn đủ tỉnh/thành, quận/huyện, phường/xã để tính phí GHN.");
-      setShippingLoading(false);
-      setIsFreeShipping(false);
-      setFreeShippingReason("");
-      return undefined;
-    }
-
-    const requestId = shippingRequestRef.current + 1;
-    shippingRequestRef.current = requestId;
-    const controller = new AbortController();
-    setShippingLoading(true);
-    setShippingError("");
-
-    const timer = window.setTimeout(async () => {
-      try {
-        const services = await getAvailableServices(
-          selectedAddress.districtId,
-          controller.signal
-        );
-        const service =
-          services.find((item) => item.serviceId) || services[0] || null;
-
-        if (!service?.serviceId) {
-          throw new Error("GHN không có gói dịch vụ khả dụng cho tuyến này.");
-        }
-
-        const feeData = await calculateShippingFee(
-          {
-            toDistrictId: selectedAddress.districtId,
-            toWardCode: selectedAddress.wardCode,
-            serviceId: service.serviceId,
-            subtotal: totalPrice,
-            items: productsToPay.map(item => {
-              const product = item.product || item;
-              return {
-                productId: product.productId,
-                quantity: item.quantity || 1
-              };
-            }),
-            insuranceValue,
-          },
-          controller.signal
-        );
-
-        if (shippingRequestRef.current !== requestId) return;
-
-        const totalFee = Number(feeData?.totalFee || 0);
-        setShippingService(service);
-        setShippingFee(totalFee);
-        setIsFreeShipping(Boolean(feeData?.freeShipping));
-        setFreeShippingReason(feeData?.freeShippingReason || "");
-        console.debug("[GHN] Fee calculated", {
-          serviceId: service.serviceId,
-          totalFee,
-          toDistrictId: selectedAddress.districtId,
-          toWardCode: selectedAddress.wardCode,
-          freeShipping: feeData?.freeShipping,
-          freeShippingReason: feeData?.freeShippingReason,
-        });
-      } catch (error) {
-        if (isGhnRequestCanceled(error)) return;
-        console.error("[GHN] Calculate fee failed:", error);
-        if (shippingRequestRef.current === requestId) {
-          setShippingFee(0);
-          setShippingService(null);
-          setIsFreeShipping(false);
-          setFreeShippingReason("");
-          setShippingError(
-            `${extractGhnError(error)}. Tạm thời hệ thống giữ phí vận chuyển 0đ.`
-          );
-        }
-      } finally {
-        if (shippingRequestRef.current === requestId) {
-          setShippingLoading(false);
-        }
-      }
-    }, SHIPPING_DEBOUNCE_MS);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [
-    selectedAddress,
-    isAddressReady,
-    productsToPay,
-    totalPrice,
-    insuranceValue,
-  ]);
 
   // Fetch Payment Methods
   useEffect(() => {
@@ -552,9 +424,9 @@ export default function Checkout() {
     oldOrderIds,
   });
 
-  // [PAYPAL] Đơn hàng chỉ hợp lệ khi đã chọn địa chỉ đầy đủ và phí ship đã tính xong.
+  // [PAYPAL] Đơn hàng chỉ hợp lệ khi đã chọn địa chỉ đầy đủ.
   const isCheckoutReady = Boolean(
-    selectedAddress && isAddressReady && !shippingLoading
+    selectedAddress && isAddressReady
   );
 
   // [PAYPAL] Sau khi PayPal capture thành công -> tạo Order + Payment (status Completed),
@@ -592,13 +464,8 @@ export default function Checkout() {
       return messageApi.warning("Vui lòng chọn địa chỉ nhận hàng!");
     if (!isAddressReady)
       return messageApi.warning("Vui lòng chọn đủ tỉnh/thành, quận/huyện, phường/xã!");
-    if (shippingLoading)
-      return messageApi.warning("Đang tính phí vận chuyển, vui lòng chờ giây lát!");
     if (!paymentMethod)
       return messageApi.warning("Vui lòng chọn phương thức thanh toán!");
-    if (shippingError) {
-      messageApi.warning("GHN đang lỗi, hệ thống tạm giữ phí vận chuyển 0đ.");
-    }
 
     const orderPayload = buildOrderPayload();
 
@@ -1041,30 +908,8 @@ export default function Checkout() {
                       <span className="flex items-center gap-1">
                         <Truck className="w-4 h-4" /> Phí vận chuyển
                       </span>
-                      <span>
-                        {shippingLoading
-                          ? "Đang tính..."
-                          : isFreeShipping
-                            ? "Miễn phí"
-                            : `${shippingFee.toLocaleString()} ₫`}
-                      </span>
+                      <span className="font-semibold text-green-600">Miễn phí</span>
                     </div>
-                    {isFreeShipping && !shippingLoading && freeShippingReason && (
-                      <p className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded inline-block mt-1">
-                        {freeShippingReason}
-                      </p>
-                    )}
-                    {shippingService && !shippingLoading && (
-                      <p className="text-xs text-blue-600">
-                        GHN: {shippingService.shortName || "Dịch vụ khả dụng"}{" "}
-                        #{shippingService.serviceId}
-                      </p>
-                    )}
-                    {shippingError && (
-                      <p className="text-xs text-amber-600 leading-relaxed">
-                        {shippingError}
-                      </p>
-                    )}
                     <div className="flex justify-between items-center pt-3 border-t border-gray-100">
                       <span className="font-bold text-gray-900 text-base">
                         Tổng thanh toán
@@ -1080,8 +925,7 @@ export default function Checkout() {
                     <div className="space-y-2">
                       {!isCheckoutReady && (
                         <p className="text-xs text-amber-600 text-center">
-                          Vui lòng chọn địa chỉ đầy đủ và chờ tính phí vận chuyển
-                          trước khi thanh toán.
+                          Vui lòng chọn địa chỉ đầy đủ trước khi thanh toán.
                         </p>
                       )}
                       <PayPalButton
@@ -1099,12 +943,9 @@ export default function Checkout() {
                   ) : (
                     <button
                       onClick={handleConfirmOrder}
-                      disabled={shippingLoading}
-                      className={`w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 active:scale-[0.98] transition shadow-md hover:shadow-lg flex items-center justify-center gap-2 ${
-                        shippingLoading ? "opacity-70 cursor-wait" : ""
-                      }`}
+                      className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 active:scale-[0.98] transition shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                     >
-                      <span>{shippingLoading ? "Đang tính phí..." : "Đặt hàng"}</span>
+                      <span>Đặt hàng</span>
                       <ChevronRight className="w-5 h-5 opacity-80" />
                     </button>
                   )}

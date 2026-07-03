@@ -348,11 +348,10 @@ function ProductGallery({
                 setActiveImageIndex(index);
                 setActiveMedia("image");
               }}
-              className={`h-20 w-20 flex-none overflow-hidden rounded-2xl border bg-white transition lg:h-24 lg:w-24 ${
-                activeMedia === "image" && activeImageIndex === index
+              className={`h-20 w-20 flex-none overflow-hidden rounded-2xl border bg-white transition lg:h-24 lg:w-24 ${activeMedia === "image" && activeImageIndex === index
                   ? "border-[#2a2925] shadow-[0_18px_40px_rgba(52,43,32,0.18)]"
                   : "border-transparent opacity-70 hover:opacity-100"
-              }`}
+                }`}
             >
               <img src={image} alt={`${product.productName} - góc nhìn ${index + 1}`} className="h-full w-full object-cover" />
             </motion.button>
@@ -363,11 +362,10 @@ function ProductGallery({
               type="button"
               whileHover={{ y: -3 }}
               onClick={() => setActiveMedia("model")}
-              className={`flex h-20 w-20 flex-none items-center justify-center rounded-2xl border bg-[#24231f] text-[#f8f6f2] transition lg:h-24 lg:w-24 ${
-                activeMedia === "model"
+              className={`flex h-20 w-20 flex-none items-center justify-center rounded-2xl border bg-[#24231f] text-[#f8f6f2] transition lg:h-24 lg:w-24 ${activeMedia === "model"
                   ? "border-[#c4aa75] shadow-[0_18px_40px_rgba(52,43,32,0.22)]"
                   : "border-transparent opacity-80 hover:opacity-100"
-              }`}
+                }`}
               aria-label="Xem mô hình 3D"
             >
               <Box size={24} />
@@ -406,7 +404,7 @@ function ProductGallery({
                     ios-src={product.arModelUsdz}
                     ar
                     ar-modes="scene-viewer quick-look webxr"
-                    ar-scale="fixed"
+                    ar-scale="auto"
                     ar-placement="floor"
                     camera-controls
                     auto-rotate
@@ -421,7 +419,7 @@ function ProductGallery({
                       slot="ar-button"
                       className="absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full bg-[#1f1f1d] px-6 py-3 text-sm font-normal text-[#f8f6f2] shadow-[0_18px_45px_rgba(0,0,0,0.28)]"
                     >
-                      Ướm thử trong không gian
+                      Thử ngay
                     </button>
 
                     {/* Loading poster */}
@@ -468,10 +466,6 @@ function ProductInfo({
   reviewCount,
   quantity,
   setQuantity,
-  selectedColor,
-  setSelectedColor,
-  selectedMaterial,
-  setSelectedMaterial,
   isWishlisted,
   setIsWishlisted,
   isOutOfStock,
@@ -494,11 +488,10 @@ function ProductInfo({
           <button
             type="button"
             onClick={() => setIsWishlisted((value) => !value)}
-            className={`flex h-11 items-center justify-center gap-2 rounded-full border px-4 text-sm transition ${
-              isWishlisted
+            className={`flex h-11 items-center justify-center gap-2 rounded-full border px-4 text-sm transition ${isWishlisted
                 ? "border-[#c4aa75] bg-[#c4aa75] text-white"
                 : "border-[#d6cbbb] bg-white/55 text-[#2a2925] hover:border-[#a88c55]"
-            }`}
+              }`}
             aria-label="Yêu thích"
           >
             <Heart size={18} fill={isWishlisted ? "currentColor" : "transparent"} />
@@ -542,7 +535,7 @@ function ProductInfo({
         </p>
       </motion.div>
 
-      <motion.div variants={fadeUp} className="mt-7 space-y-7">    
+      <motion.div variants={fadeUp} className="mt-7 space-y-7">
         <div className="flex flex-wrap items-center justify-between gap-5">
           <div>
             <p className="mb-3 text-xs font-normal uppercase tracking-[0.24em] text-[#4c463d]">Số lượng</p>
@@ -631,9 +624,8 @@ function ProductTabs({ product, activeTab, setActiveTab, reviews, averageRating,
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
-              className={`relative flex-none rounded-full px-5 py-3 text-sm uppercase tracking-[0.18em] transition ${
-                activeTab === tab.key ? "text-[#f8f6f2]" : "text-[#665d52] hover:text-[#211f1c]"
-              }`}
+              className={`relative flex-none rounded-full px-5 py-3 text-sm uppercase tracking-[0.18em] transition ${activeTab === tab.key ? "text-[#f8f6f2]" : "text-[#665d52] hover:text-[#211f1c]"
+                }`}
             >
               {activeTab === tab.key && (
                 <motion.span

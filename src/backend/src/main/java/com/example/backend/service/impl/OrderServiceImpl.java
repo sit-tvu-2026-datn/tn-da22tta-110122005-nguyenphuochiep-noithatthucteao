@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class OrderServiceImpl implements OrderService {
+    private static final BigDecimal FREE_SHIPPING_FEE = BigDecimal.ZERO;
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
@@ -105,6 +107,7 @@ public class OrderServiceImpl implements OrderService {
     public Order createOrder(Order order) {
         order.setOrderId(generateOrderId());
         order.setOrderDate(LocalDateTime.now());
+        order.setShippingFee(FREE_SHIPPING_FEE);
         if (order.getOrderStatus() == null) order.setOrderStatus("Pending");
 
         if (Boolean.TRUE.equals(order.getIsOrder()) && order.getCouponId() != null) {
@@ -163,7 +166,7 @@ public class OrderServiceImpl implements OrderService {
         order.setShippingAddress(req.getShippingAddress());
         order.setCustomerNote(req.getCustomerNote());
         order.setTotalAmount(req.getTotalAmount());
-        order.setShippingFee(req.getShippingFee());
+        order.setShippingFee(FREE_SHIPPING_FEE);
         order.setIsOrder(true); // Đây là đơn thật
         order.setCouponId(req.getCouponId());
 
@@ -213,7 +216,7 @@ public class OrderServiceImpl implements OrderService {
         newOrder.setShippingAddress(order.getShippingAddress());
         newOrder.setCustomerNote(order.getCustomerNote());
         newOrder.setTotalAmount(order.getTotalAmount());
-        newOrder.setShippingFee(order.getShippingFee());
+        newOrder.setShippingFee(FREE_SHIPPING_FEE);
         newOrder.setOrderStatus("Pending");
         newOrder.setOrderDate(LocalDateTime.now());
         newOrder.setIsOrder(true);

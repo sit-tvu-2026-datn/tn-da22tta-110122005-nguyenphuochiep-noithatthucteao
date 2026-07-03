@@ -1,6 +1,5 @@
 package com.example.backend.service.impl;
 
-import com.example.backend.model.ProductViewHistory;
 import com.example.backend.model.UserProductInteraction;
 import com.example.backend.repository.ProductViewHistoryRepository;
 import com.example.backend.repository.RecommendationCacheRepository;
@@ -38,19 +37,9 @@ public class InteractionTrackingServiceImpl implements InteractionTrackingServic
 
         try {
             // 1. Cập nhật bảng Lịch sử xem (product_view_history)
-            Optional<ProductViewHistory> existingView = viewHistoryRepository.findByUserIdAndProductId(userId, productId);
-            if (existingView.isPresent()) {
-                ProductViewHistory viewHistory = existingView.get();
-                viewHistory.setViewCount(viewHistory.getViewCount() + 1);
-                viewHistoryRepository.save(viewHistory);
-            } else {
-                ProductViewHistory viewHistory = ProductViewHistory.builder()
-                        .userId(userId)
-                        .productId(productId)
-                        .viewCount(1)
-                        .build();
-                viewHistoryRepository.save(viewHistory);
-            }
+            // Sử dụng upsert nguyên tử (INSERT ... ON DUPLICATE KEY UPDATE)
+            // để tránh lỗi Duplicate entry khi có request đồng thời.
+            viewHistoryRepository.upsertViewHistory(userId, productId);
 
             // 2. Ghi nhận/cập nhật bảng điểm Tương tác (user_product_interaction)
             List<UserProductInteraction> interactions = interactionRepository.findByUserIdAndProductId(userId, productId);

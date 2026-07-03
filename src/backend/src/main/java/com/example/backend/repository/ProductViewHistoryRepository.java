@@ -2,6 +2,7 @@ package com.example.backend.repository;
 
 import com.example.backend.model.ProductViewHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -44,4 +45,16 @@ public interface ProductViewHistoryRepository extends JpaRepository<ProductViewH
     @Query("SELECT p.productId, SUM(p.viewCount) FROM ProductViewHistory p " +
             "WHERE p.lastViewedAt >= :since GROUP BY p.productId")
     List<Object[]> sumViewCountSince(@Param("since") LocalDateTime since);
+
+    /**
+     * Atomic upsert: chèn bản ghi mới hoặc cập nhật nếu đã tồn tại (user_id, product_id).
+     * Sử dụng MySQL INSERT ... ON DUPLICATE KEY UPDATE để tránh lỗi Duplicate entry
+     * khi nhiều request đồng thời ghi nhận cùng một lượt xem.
+     */
+    @Modifying
+    @Query(value = "INSERT INTO product_view_history (user_id, product_id, view_count, created_at, last_viewed_at) " +
+            "VALUES (:userId, :productId, 1, NOW(), NOW()) " +
+            "ON DUPLICATE KEY UPDATE view_count = view_count + 1, last_viewed_at = NOW()",
+            nativeQuery = true)
+    void upsertViewHistory(@Param("userId") String userId, @Param("productId") String productId);
 }
