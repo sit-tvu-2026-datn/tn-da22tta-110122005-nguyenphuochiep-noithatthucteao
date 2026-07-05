@@ -65,6 +65,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/room-planner/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payment-methods/**").permitAll()
+                        // Callback verify chữ ký VNPAY phải công khai: bảo mật dựa trên
+                        // chữ ký HMAC (vnp_SecureHash), không phụ thuộc JWT (JWT có thể
+                        // hết hạn khi user đang ở trang cổng thanh toán).
+                        .requestMatchers(HttpMethod.GET, "/api/vnpay/return").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/coupons/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/flash-sales/**").permitAll()

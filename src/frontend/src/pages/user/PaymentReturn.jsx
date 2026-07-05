@@ -45,8 +45,17 @@ export default function PaymentReturn() {
 
     const fetchPaymentResult = async () => {
       try {
-        if (responseCode !== "00") {
-          messageApi.error("Thanh toán thất bại!");
+        // [BẢO MẬT] Xác thực chữ ký (vnp_SecureHash) ở BACKEND trước khi tạo đơn.
+        // Truyền NGUYÊN chuỗi query VNPAY trả về (location.search) để backend verify
+        // HMAC — KHÔNG dùng axios params để tránh bị re-encode làm sai chữ ký.
+        const { data: verifyResult } = await api.get(
+          `/api/vnpay/return${location.search}`
+        );
+
+        // success = chữ ký hợp lệ VÀ vnp_ResponseCode/vnp_TransactionStatus == "00".
+        // Nếu chữ ký sai (giả mạo) hoặc thanh toán thất bại -> KHÔNG tạo đơn.
+        if (!verifyResult?.success) {
+          messageApi.error(verifyResult?.message || "Thanh toán thất bại!");
           setLoadingMessage("Thanh toán thất bại! Quay về giỏ hàng...");
           setTimeout(() => navigate("/cart"), 3000);
           return;

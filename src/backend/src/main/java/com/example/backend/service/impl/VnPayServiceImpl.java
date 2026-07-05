@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -45,7 +47,7 @@ public class VnPayServiceImpl implements VnPayService {
         params.put("vnp_Version", vnp_Version);
         params.put("vnp_Command", vnp_Command);
         params.put("vnp_TmnCode", vnp_TmnCode);
-        params.put("vnp_Amount", String.valueOf(amount * 100)); // gửi nguyên số tiền *100
+        params.put("vnp_Amount", String.valueOf((long) amount * 100L)); // *100 theo chuẩn, ép long tránh tràn int
         params.put("vnp_CurrCode", "VND");
         params.put("vnp_TxnRef", vnp_TxnRef);
         params.put("vnp_OrderInfo", "Thanh toán đơn hàng " + vnp_TxnRef);
@@ -97,45 +99,37 @@ public class VnPayServiceImpl implements VnPayService {
     public Map<String, Object> processReturn(HttpServletRequest req) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String queryString = req.getQueryString();
-            log.info("VNPAY Return - Query String: {}", queryString);
-            
-            if (queryString == null || queryString.isEmpty()) {
+            log.info("VNPAY Return - Query String: {}", req.getQueryString());
+
+            // Lấy toàn bộ tham số trả về. Dùng getParameter() để có GIÁ TRỊ ĐÃ DECODE,
+            // sau đó re-encode bằng URLEncoder (dấu cách -> '+') — ĐỒNG NHẤT với cách
+            // ký lúc tạo URL ở createPayment. Đây đúng là hashAllFields của chuẩn VNPAY.
+            Map<String, String> fields = new HashMap<>();
+            Enumeration<String> paramNames = req.getParameterNames();
+            while (paramNames.hasMoreElements()) {
+                String name = paramNames.nextElement();
+                String value = req.getParameter(name);
+                if (value != null && value.length() > 0) {
+                    String encName = URLEncoder.encode(name, StandardCharsets.UTF_8);
+                    String encValue = URLEncoder.encode(value, StandardCharsets.UTF_8);
+                    fields.put(encName, encValue);
+                }
+            }
+
+            String vnp_SecureHash = req.getParameter("vnp_SecureHash");
+            if (vnp_SecureHash == null || vnp_SecureHash.isEmpty()) {
                 result.put("success", false);
                 result.put("message", "Invalid request");
                 return result;
             }
 
-            Map<String, String> fields = new HashMap<>();
-            String vnp_SecureHash = null;
-            for (String part : queryString.split("&")) {
-                String[] kv = part.split("=", 2);
-                if (kv.length == 0) continue;
-                String key = kv[0];
-                String val = kv.length > 1 ? kv[1] : "";
-                
-                // Chỉ lấy các tham số bắt đầu bằng vnp_ và bỏ qua các tham số ký
-                if (key.startsWith("vnp_")) {
-                    if (key.equals("vnp_SecureHash")) {
-                        vnp_SecureHash = val;
-                    } else if (!key.equals("vnp_SecureHashType")) {
-                        fields.put(key, val);
-                    }
-                }
-            }
+            // Loại bỏ đúng vnp_SecureHash và vnp_SecureHashType TRƯỚC khi tính chữ ký
+            fields.remove("vnp_SecureHash");
+            fields.remove("vnp_SecureHashType");
 
-            Map<String, String> sorted = new TreeMap<>(fields);
-            StringBuilder hashData = new StringBuilder();
-            Iterator<Map.Entry<String, String>> it = sorted.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry<String, String> e = it.next();
-                hashData.append(e.getKey()).append("=").append(e.getValue());
-                if (it.hasNext()) hashData.append("&");
-            }
-
-            String calculatedHash = VnPayUtil.hmacSHA512(vnPayConfig.getHashSecret(), hashData.toString());
+            String calculatedHash = VnPayUtil.hashAllFields(vnPayConfig.getHashSecret(), fields);
             log.info("VNPAY Return - Received Hash: {}, Calculated Hash: {}", vnp_SecureHash, calculatedHash);
-            
+
             if (!calculatedHash.equalsIgnoreCase(vnp_SecureHash)) {
                 log.warn("VNPAY Return - Chữ ký không hợp lệ!");
                 result.put("success", false);
@@ -143,22 +137,23 @@ public class VnPayServiceImpl implements VnPayService {
                 return result;
             }
 
-            String vnp_ResponseCode = sorted.get("vnp_ResponseCode");
-            String vnp_TransactionStatus = sorted.get("vnp_TransactionStatus");
-            String vnp_TxnRef = sorted.get("vnp_TxnRef");
-            String vnp_Amount = sorted.get("vnp_Amount");
+            // Đọc dữ liệu nghiệp vụ từ giá trị ĐÃ DECODE (không lấy từ map đã encode)
+            String vnp_ResponseCode = req.getParameter("vnp_ResponseCode");
+            String vnp_TransactionStatus = req.getParameter("vnp_TransactionStatus");
+            String vnp_TxnRef = req.getParameter("vnp_TxnRef");
+            String vnp_Amount = req.getParameter("vnp_Amount");
 
             boolean success = "00".equals(vnp_ResponseCode) && "00".equals(vnp_TransactionStatus);
             result.put("success", success);
             result.put("txnRef", vnp_TxnRef);
-            
+
             long amountVal = 0;
             if (vnp_Amount != null && !vnp_Amount.isEmpty()) {
                 amountVal = Long.parseLong(vnp_Amount) / 100;
             }
             result.put("amount", amountVal); // hiển thị đúng VND
             result.put("message", success ? "Thanh toán thành công!" : "Thanh toán thất bại!");
-            
+
             log.info("VNPAY Return - Transaction Status: {}, Success: {}, TxnRef: {}", vnp_TransactionStatus, success, vnp_TxnRef);
             return result;
         } catch (Exception e) {

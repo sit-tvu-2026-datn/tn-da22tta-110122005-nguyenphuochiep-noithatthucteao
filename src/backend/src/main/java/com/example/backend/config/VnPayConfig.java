@@ -18,8 +18,14 @@ public class VnPayConfig {
     @Value("${vnpay.hashSecret:}")
     private String hashSecret;
 
-    public String getPayUrl() { return payUrl; }
-    public String getReturnUrl() { return returnUrl; }
-    public String getTmnCode() { return tmnCode; }
-    public String getHashSecret() { return hashSecret; }
+    // .trim() để chống khoảng trắng/xuống dòng vô hình khi dán biến môi trường
+    // trên Render/Docker — nguyên nhân kinh điển khiến chữ ký sai chỉ trên host.
+    public String getPayUrl() { return trim(payUrl); }
+    public String getReturnUrl() { return trim(returnUrl); }
+    public String getTmnCode() { return trim(tmnCode); }
+    public String getHashSecret() { return trim(hashSecret); }
+
+    private static String trim(String v) {
+        return v == null ? null : v.trim();
+    }
 }
