@@ -30,6 +30,7 @@ import {
 import { ShoppingCart } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import api from "../../config/api";
+import { getOrderItemPriceInfo, formatPrice } from "../../utils/price";
 
 const { Title, Text } = Typography;
 
@@ -621,11 +622,24 @@ export default function OrderManager() {
                       Số lượng: x{d.quantity}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-indigo-600 m-0">
-                      {d.originalUnitPrice.toLocaleString()} ₫
-                    </p>
-                  </div>
+                  {(() => {
+                    const info = getOrderItemPriceInfo(d);
+                    return (
+                      <div className="text-right">
+                        <p className="font-semibold text-indigo-600 m-0">
+                          {formatPrice(info.finalPrice)}
+                        </p>
+                        {info.hasDiscount && (
+                          <p className="line-through text-xs text-gray-400 m-0">
+                            {formatPrice(info.originalPrice)}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-gray-400 m-0">
+                          {formatPrice(info.subtotal)}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

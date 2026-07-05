@@ -30,6 +30,8 @@ import Checkout from "./pages/user/Checkout";
 import Purchase from "./pages/user/Purchase";
 import CartPage from "./pages/user/CartPage";
 import PaymentReturn from "./pages/user/PaymentReturn";
+import PaymentSuccess from "./pages/user/PaymentSuccess";
+import PaymentFailed from "./pages/user/PaymentFailed";
 
 export default function App() {
   return (
@@ -50,6 +52,8 @@ export default function App() {
           <Route path="/purchase" element={<Purchase />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/payment-return" element={<PaymentReturn />} />
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment/failed" element={<PaymentFailed />} />
           <Route path="/promotions" element={<PromotionsPage />} />
           <Route path="/contact" element={<ContactPage />} />
         </Route>

@@ -15,6 +15,7 @@ import {
   CreditCard, // Icon thanh toán
 } from "lucide-react";
 import api from "../../config/api";
+import { getOrderItemPriceInfo, formatPrice } from "../../utils/price";
 
 export default function Purchase() {
   const [orders, setOrders] = useState([]);
@@ -291,13 +292,32 @@ export default function Purchase() {
                             <p className="text-sm text-gray-500">
                               Số lượng: {item.quantity}
                             </p>
+                            {(() => {
+                              const info = getOrderItemPriceInfo(item);
+                              return (
+                                <p className="text-sm mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-gray-700 font-medium">
+                                    {formatPrice(info.finalPrice)}
+                                  </span>
+                                  {info.hasDiscount && (
+                                    <>
+                                      <span className="line-through text-xs text-gray-400">
+                                        {formatPrice(info.originalPrice)}
+                                      </span>
+                                      <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+                                        -{info.discountPercent}%
+                                      </span>
+                                    </>
+                                  )}
+                                </p>
+                              );
+                            })()}
                           </div>
                           <div className="text-right sm:text-right">
                             <div className="font-medium text-gray-900">
-                              {(
-                                item.unitPrice * item.quantity
-                              ).toLocaleString()}
-                              ₫
+                              {formatPrice(
+                                getOrderItemPriceInfo(item).subtotal
+                              )}
                             </div>
                           </div>
                         </div>
@@ -509,11 +529,21 @@ export default function Purchase() {
                     </p>
                     <p className="text-xs text-gray-500">x{item.quantity}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-indigo-600">
-                      {item.unitPrice.toLocaleString()} ₫
-                    </p>
-                  </div>
+                  {(() => {
+                    const info = getOrderItemPriceInfo(item);
+                    return (
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-indigo-600">
+                          {formatPrice(info.finalPrice)}
+                        </p>
+                        {info.hasDiscount && (
+                          <p className="line-through text-[11px] text-gray-400">
+                            {formatPrice(info.originalPrice)}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

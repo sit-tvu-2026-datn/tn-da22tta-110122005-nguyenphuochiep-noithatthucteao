@@ -240,6 +240,12 @@ public class OrderServiceImpl implements OrderService {
             detail.setProduct(product);
             detail.setQuantity(od.getQuantity());
             detail.setUnitPrice(od.getUnitPrice());
+            // Lưu giá gốc để đơn hàng vẫn đúng dù sau này sản phẩm đổi giá.
+            // Nếu FE không gửi originalUnitPrice thì fallback về giá gốc của sản phẩm.
+            detail.setOriginalUnitPrice(
+                    od.getOriginalUnitPrice() != null
+                            ? od.getOriginalUnitPrice()
+                            : product.getPrice());
             detail.setOrder(newOrder);
             return detail;
         }).collect(Collectors.toList());

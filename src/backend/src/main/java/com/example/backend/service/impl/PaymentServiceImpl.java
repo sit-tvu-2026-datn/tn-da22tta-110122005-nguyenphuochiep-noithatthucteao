@@ -6,6 +6,7 @@ import com.example.backend.model.Order;
 import com.example.backend.model.PaymentStatus;
 import com.example.backend.repository.PaymentRepository;
 import com.example.backend.repository.OrderRepository;
+import com.example.backend.service.EmailService;
 import com.example.backend.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
+    private final EmailService emailService;
 
     @Override
     public PaymentDTO createPayment(PaymentDTO dto) {
@@ -38,6 +40,10 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
 
         paymentRepository.save(payment);
+
+        // Tự động gửi email xác nhận đơn hàng (VNPAY / PayPal / COD).
+        // Chạy bất đồng bộ & nuốt lỗi bên trong service -> không ảnh hưởng luồng thanh toán.
+        emailService.sendOrderConfirmationEmail(order.getOrderId());
 
         return convertToDTO(payment);
     }

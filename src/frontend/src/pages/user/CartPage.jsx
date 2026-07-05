@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import nothingImg from "../../assets/nothing.png";
 import api from "../../config/api";
+import { getProductPriceInfo, formatPrice } from "../../utils/price";
 
 export default function CartPage() {
   const userId = Cookies.get("user_id");
@@ -65,43 +66,39 @@ export default function CartPage() {
   };
 
   // --- HELPER: Lấy thông tin giá & tồn kho ---
+  // Dùng chung công thức giá của toàn hệ thống (getProductPriceInfo) để không
+  // bao giờ hiển thị/tính bằng giá gốc khi sản phẩm đang được giảm giá.
   const getProductStockInfo = (product) => {
+    const info = getProductPriceInfo(product, flashSale);
     const normalStock = product.quantity ?? 0;
 
-    // Tìm sản phẩm trong Flash Sale
-    const fsItem = flashSale?.items?.find(
-      (item) => item.productId === product.productId
-    );
-
-    // LOGIC: Chỉ áp dụng Flash Sale nếu CÒN SUẤT
-    if (fsItem && fsItem.soldCount < fsItem.quantity) {
-      const fsRemaining = fsItem.quantity - fsItem.soldCount;
-
+    // Flash Sale còn suất: giới hạn tồn kho theo suất còn lại
+    if (info.isFlashSale) {
       if (normalStock === 0) {
         return {
           isFlashSale: false,
           stock: 0,
-          price: product.price,
-          originalPrice: product.price,
+          price: info.originalPrice,
+          originalPrice: info.originalPrice,
+          discountPercent: 0,
         };
       }
-
-      const effectiveStock = Math.min(normalStock, fsRemaining);
-
       return {
         isFlashSale: true,
-        stock: effectiveStock,
-        price: fsItem.flashSalePrice, // Giá Flash Sale
-        originalPrice: product.price,
+        stock: Math.min(normalStock, info.maxAvailable),
+        price: info.finalPrice,
+        originalPrice: info.originalPrice,
+        discountPercent: info.discountPercent,
       };
     }
 
-    // Giá thường
+    // Giá thường (đã áp dụng % giảm giá của sản phẩm nếu có)
     return {
       isFlashSale: false,
       stock: normalStock,
-      price: product.price,
-      originalPrice: product.price,
+      price: info.finalPrice,
+      originalPrice: info.originalPrice,
+      discountPercent: info.discountPercent,
     };
   };
 
@@ -179,14 +176,14 @@ export default function CartPage() {
     }
   };
 
+  // Tổng tiền = Σ (giá sau giảm × số lượng) của các sản phẩm được chọn
   const selectedTotal = cartOrders.reduce((sum, order) => {
     return (
       sum +
       order.orderDetails.reduce((s, item) => {
         if (!selectedItems[item.orderDetailId]) return s;
-        const { isFlashSale, price } = getProductStockInfo(item.product);
-        const finalPrice = isFlashSale ? price : item.unitPrice;
-        return s + finalPrice * item.quantity;
+        const { price } = getProductStockInfo(item.product);
+        return s + price * item.quantity;
       }, 0)
     );
   }, 0);
@@ -199,12 +196,15 @@ export default function CartPage() {
         );
         if (selectedOrderDetails.length === 0) return null;
 
-        // Cập nhật giá và cờ Flash Sale trước khi sang Checkout
+        // Cập nhật giá (sau giảm) và cờ Flash Sale trước khi sang Checkout
         const updatedDetails = selectedOrderDetails.map((detail) => {
-          const { isFlashSale, price } = getProductStockInfo(detail.product);
+          const { isFlashSale, price, originalPrice } = getProductStockInfo(
+            detail.product
+          );
           return {
             ...detail,
-            unitPrice: price,
+            unitPrice: price, // giá thanh toán = giá sau giảm
+            originalUnitPrice: originalPrice, // giá gốc để lưu lịch sử
             isFlashSale: isFlashSale,
           };
         });
@@ -322,9 +322,9 @@ export default function CartPage() {
             <div className="space-y-4">
               {cartOrders.map((order) =>
                 order.orderDetails.map((item) => {
-                  const { isFlashSale, stock, price } = getProductStockInfo(
-                    item.product
-                  );
+                  const { isFlashSale, stock, price, originalPrice, discountPercent } =
+                    getProductStockInfo(item.product);
+                  const hasDiscount = originalPrice > price;
                   const isOutOfStock = stock === 0;
                   const isMaxReached = item.quantity >= stock;
 
@@ -394,19 +394,30 @@ export default function CartPage() {
                               </button>
                             </div>
 
-                            <p className="text-gray-500 text-sm mt-1 flex items-center gap-2">
+                            <p className="text-gray-500 text-sm mt-1 flex items-center gap-2 flex-wrap">
                               Đơn giá:
-                              {isFlashSale ? (
+                              {hasDiscount ? (
                                 <>
                                   <span className="line-through text-xs">
-                                    {item.product.price?.toLocaleString()}₫
+                                    {formatPrice(originalPrice)}
                                   </span>
-                                  <span className="text-orange-600 font-bold">
-                                    {price.toLocaleString()}₫
+                                  <span
+                                    className={`font-bold ${
+                                      isFlashSale
+                                        ? "text-orange-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
+                                    {formatPrice(price)}
                                   </span>
+                                  {discountPercent > 0 && (
+                                    <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+                                      -{discountPercent}%
+                                    </span>
+                                  )}
                                 </>
                               ) : (
-                                <span>{price.toLocaleString()}₫</span>
+                                <span>{formatPrice(price)}</span>
                               )}
                             </p>
 
@@ -483,7 +494,7 @@ export default function CartPage() {
                                   : "text-red-600"
                                   }`}
                               >
-                                {(price * item.quantity).toLocaleString()}₫
+                                {formatPrice(price * item.quantity)}
                               </span>
                             </div>
                           </div>
@@ -504,14 +515,14 @@ export default function CartPage() {
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between text-gray-600">
                   <span>Tạm tính</span>
-                  <span>{selectedTotal.toLocaleString()}₫</span>
+                  <span>{formatPrice(selectedTotal)}</span>
                 </div>
                 <div className="border-t border-dashed border-gray-200 pt-4 flex justify-between items-center">
                   <span className="font-bold text-gray-900 text-lg">
                     Tổng cộng
                   </span>
                   <span className="font-bold text-2xl text-red-600">
-                    {selectedTotal.toLocaleString()}₫
+                    {formatPrice(selectedTotal)}
                   </span>
                 </div>
               </div>

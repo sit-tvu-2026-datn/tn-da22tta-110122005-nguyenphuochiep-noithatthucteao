@@ -10,6 +10,7 @@ import { ArrowUpDown, ChevronLeft, ChevronRight, Eye, ShoppingCart, Filter, X, G
 import Cookies from "js-cookie";
 import { CartContext } from "../context/CartContext.jsx";
 import api from "../config/api";
+import { getProductPriceInfo as getSharedPriceInfo } from "../utils/price";
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Mới nhất" },
@@ -217,41 +218,11 @@ export default function Products() {
     fetchData();
   }, []);
 
-  // --- HELPER ---
-  const getProductPriceInfo = useCallback((product) => {
-    if (flashSale && flashSale.items) {
-      const fsItem = flashSale.items.find(
-        (item) => item.productId === product.productId,
-      );
-      if (fsItem) {
-        const isStillOnSale = fsItem.soldCount < fsItem.quantity;
-        if (isStillOnSale) {
-          return {
-            finalPrice: fsItem.flashSalePrice,
-            originalPrice: product.price,
-            discountPercent: Math.round(
-              ((product.price - fsItem.flashSalePrice) / product.price) * 100,
-            ),
-            isFlashSale: true,
-            fsQuantity: fsItem.quantity,
-            fsSold: fsItem.soldCount,
-          };
-        }
-      }
-    }
-
-    const normalFinalPrice =
-      product.discount > 0
-        ? product.price * (1 - product.discount / 100)
-        : product.price;
-
-    return {
-      finalPrice: normalFinalPrice,
-      originalPrice: product.price,
-      discountPercent: product.discount,
-      isFlashSale: false,
-    };
-  }, [flashSale]);
+  // --- HELPER: dùng công thức giá dùng chung của toàn hệ thống ---
+  const getProductPriceInfo = useCallback(
+    (product) => getSharedPriceInfo(product, flashSale),
+    [flashSale]
+  );
 
   const flashSaleList = useMemo(() => (
     flashSale?.items

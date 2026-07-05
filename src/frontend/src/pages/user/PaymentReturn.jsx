@@ -4,7 +4,6 @@ import { message } from "antd";
 import { CheckCircle, XCircle, Loader2, ShieldCheck } from "lucide-react";
 import Cookies from "js-cookie";
 import { AuthContext } from "../../context/AuthContext";
-import { sendInvoiceEmail } from "../EmailService";
 import api from "../../config/api";
 
 const generateTransactionId = () =>
@@ -38,8 +37,10 @@ export default function PaymentReturn() {
     const responseCode = queryParams.get("vnp_ResponseCode");
 
     if (!responseCode) {
-      messageApi.error("Không tìm thấy dữ liệu giao dịch!");
-      setTimeout(() => navigate("/cart"), 3000); // Quay về giỏ hàng nếu lỗi
+      navigate("/payment/failed", {
+        replace: true,
+        state: { reason: "Không tìm thấy dữ liệu giao dịch." },
+      });
       return;
     }
 
@@ -55,9 +56,14 @@ export default function PaymentReturn() {
         // success = chữ ký hợp lệ VÀ vnp_ResponseCode/vnp_TransactionStatus == "00".
         // Nếu chữ ký sai (giả mạo) hoặc thanh toán thất bại -> KHÔNG tạo đơn.
         if (!verifyResult?.success) {
-          messageApi.error(verifyResult?.message || "Thanh toán thất bại!");
-          setLoadingMessage("Thanh toán thất bại! Quay về giỏ hàng...");
-          setTimeout(() => navigate("/cart"), 3000);
+          navigate("/payment/failed", {
+            replace: true,
+            state: {
+              reason:
+                verifyResult?.message ||
+                "Giao dịch không thành công hoặc đã bị hủy.",
+            },
+          });
           return;
         }
 
@@ -98,15 +104,28 @@ export default function PaymentReturn() {
         // Xóa session sau khi thành công
         sessionStorage.removeItem("pendingOrder");
 
-        messageApi.success("Thanh toán thành công!");
-        messageApi.success("Đặt hàng thành công!");        
-        await sendInvoiceEmail(createdOrderId);
-        setTimeout(() => navigate("/purchase"), 2000);
+        // Email xác nhận được BACKEND tự động gửi (Brevo API) sau khi lưu payment.
+        // Frontend không cần gọi gửi email nữa để tránh gửi trùng.
+
+        // Điều hướng sang trang Thanh toán thành công
+        navigate("/payment/success", {
+          replace: true,
+          state: {
+            orderId: createdOrderId,
+            amount: pendingOrder.totalAmount,
+            transactionId: transactionIdFromVNPAY,
+          },
+        });
       } catch (err) {
         console.error(err);
-        messageApi.error(`Lỗi: ${err.message}`);
-        setLoadingMessage("Lỗi xử lý! Vui lòng liên hệ CSKH hoặc thử lại.");
-        // Không navigate về giỏ hàng ngay để user đọc lỗi, hoặc tùy logic của bạn
+        navigate("/payment/failed", {
+          replace: true,
+          state: {
+            reason:
+              "Đã xảy ra lỗi khi ghi nhận đơn hàng: " +
+              (err.message || "Vui lòng liên hệ CSKH."),
+          },
+        });
       }
     };
 

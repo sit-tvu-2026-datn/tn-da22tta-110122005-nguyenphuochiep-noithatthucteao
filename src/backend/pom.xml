@@ -111,10 +111,8 @@
 			<scope>test</scope>
 		</dependency>
 
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-mail</artifactId>
-		</dependency>
+		<!-- Email gửi qua Brevo REST API (dùng RestTemplate của spring-web).
+		     Đã gỡ spring-boot-starter-mail / JavaMailSender / SMTP. -->
 
 	</dependencies>
 

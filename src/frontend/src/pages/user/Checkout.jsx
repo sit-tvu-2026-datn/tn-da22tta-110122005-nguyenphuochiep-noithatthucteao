@@ -26,6 +26,20 @@ import {
   getProvinces,
   getWards,
 } from "../../services/ghnService";
+import { formatPrice } from "../../utils/price";
+
+// Lấy giá sau giảm + giá gốc của 1 dòng sản phẩm trong trang thanh toán.
+// Item có thể đến từ giỏ hàng (unitPrice/originalUnitPrice) hoặc "Mua ngay"
+// (product.price đã là giá sau giảm, originalPrice là giá gốc).
+const getCheckoutItemPrice = (item) => {
+  const finalPrice = Number(
+    item.unitPrice ?? item.product?.price ?? item.price ?? 0
+  );
+  const originalPrice = Number(
+    item.originalUnitPrice ?? item.originalPrice ?? item.product?.price ?? finalPrice
+  );
+  return { finalPrice, originalPrice, hasDiscount: originalPrice > finalPrice };
+};
 
 const FREE_SHIPPING_FEE = 0;
 
@@ -198,27 +212,30 @@ export default function Checkout() {
   }, [isModalOpen, modalData.districtId, messageApi]);
 
   useEffect(() => {
-    if ((!state || !state.product) && !singleProduct) {
-      const pendingOrder = sessionStorage.getItem("pendingOrder");
-      if (pendingOrder) {
-        const {
-          singleProduct: sp,
-          items: it,
-          oldOrderIds: oldIds,
-          note: n,
-          paymentMethod: pm,
-          couponId: cid,
-        } = JSON.parse(pendingOrder);
+    // Chỉ khôi phục đơn từ sessionStorage khi KHÔNG có dữ liệu điều hướng
+    // (tức là user F5/reload trang checkout). Nếu vừa bấm "Tiến hành đặt hàng"
+    // từ giỏ hàng (state.order.orderDetails có sẵn) thì TUYỆT ĐỐI không ghi đè,
+    // tránh lỗi giỏ hàng bị trống sau khi thanh toán thất bại.
+    const hasNavData = Boolean(
+      state?.product || state?.order?.orderDetails?.length
+    );
+    if (hasNavData || singleProduct || items.length > 0) return;
 
-        setSingleProduct(sp || null);
-        setItems(it || []);
-        setOldOrderIds(oldIds || []);
-        setNote(n || "");
-        setPaymentMethod(pm || "PM001");
-        setSelectedCouponId(cid || null);
-      }
+    const raw = sessionStorage.getItem("pendingOrder");
+    if (!raw) return;
+
+    try {
+      // pendingOrder có cùng cấu trúc với buildOrderPayload() (dùng orderDetails).
+      const saved = JSON.parse(raw);
+      setItems(saved.orderDetails || []);
+      setOldOrderIds(saved.oldOrderIds || []);
+      setNote(saved.customerNote || "");
+      setPaymentMethod(saved.paymentMethodId || "PM001");
+      setSelectedCouponId(saved.couponId || null);
+    } catch (err) {
+      console.error("Restore pendingOrder error:", err);
     }
-  }, [state, singleProduct]);
+  }, [state, singleProduct, items.length]);
 
   const productsToPay = useMemo(
     () => [
@@ -230,10 +247,9 @@ export default function Checkout() {
     [items, singleProduct, state?.quantity]
   );
 
+  // Tổng tiền = Σ (giá sau giảm × số lượng). KHÔNG dùng giá gốc để tính.
   const totalPrice = productsToPay.reduce(
-    (sum, item) =>
-      sum +
-      (item.subtotal || (item.product?.price || item.price) * item.quantity),
+    (sum, item) => sum + getCheckoutItemPrice(item).finalPrice * item.quantity,
     0
   );
 
@@ -412,15 +428,17 @@ export default function Checkout() {
     shippingFee: shippingFee,
     isOrder: true,
     orderStatus: "pending",
-    orderDetails: productsToPay.map((item) => ({
-      product: { productId: item.product?.productId || item.productId },
-      quantity: item.quantity,
-      unitPrice: item.unitPrice || item.product?.price || item.price,
-      originalUnitPrice:
-        item.originalUnitPrice || item.product?.price || item.price,
-      // TRUYỀN FLAG ISFLASHSALE ĐỂ BACKEND TRỪ KHO FLASH SALE
-      isFlashSale: item.isFlashSale ? 1 : 0,
-    })),
+    orderDetails: productsToPay.map((item) => {
+      const { finalPrice, originalPrice } = getCheckoutItemPrice(item);
+      return {
+        product: { productId: item.product?.productId || item.productId },
+        quantity: item.quantity,
+        unitPrice: finalPrice, // giá thanh toán = giá sau giảm
+        originalUnitPrice: originalPrice, // giá gốc (lưu lịch sử)
+        // TRUYỀN FLAG ISFLASHSALE ĐỂ BACKEND TRỪ KHO FLASH SALE
+        isFlashSale: item.isFlashSale ? 1 : 0,
+      };
+    }),
     oldOrderIds,
   });
 
@@ -761,23 +779,29 @@ export default function Checkout() {
                         </p>
                       </div>
                       <div className="flex justify-between items-end">
-                        <p className="text-gray-500 text-sm">
+                        <div className="text-gray-500 text-sm">
                           Đơn giá:{" "}
-                          {(
-                            item.unitPrice ||
-                            item.product?.price ||
-                            item.price
-                          ).toLocaleString()}{" "}
-                          ₫
-                        </p>
+                          {(() => {
+                            const { finalPrice, originalPrice, hasDiscount } =
+                              getCheckoutItemPrice(item);
+                            return hasDiscount ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className="line-through text-xs text-gray-400">
+                                  {formatPrice(originalPrice)}
+                                </span>
+                                <span className="text-red-600 font-semibold">
+                                  {formatPrice(finalPrice)}
+                                </span>
+                              </span>
+                            ) : (
+                              formatPrice(finalPrice)
+                            );
+                          })()}
+                        </div>
                         <p className="font-bold text-gray-900 text-lg">
-                          {(
-                            item.subtotal ||
-                            (item.unitPrice ||
-                              item.product?.price ||
-                              item.price) * item.quantity
-                          ).toLocaleString()}{" "}
-                          ₫
+                          {formatPrice(
+                            getCheckoutItemPrice(item).finalPrice * item.quantity
+                          )}
                         </p>
                       </div>
                     </div>

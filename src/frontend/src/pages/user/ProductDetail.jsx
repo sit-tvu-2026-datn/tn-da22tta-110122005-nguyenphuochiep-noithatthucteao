@@ -24,6 +24,7 @@ import { CartContext } from "../../context/CartContext";
 import "@google/model-viewer";
 import api from "../../config/api";
 import RecommendationCarousel from "../../components/recommend/RecommendationCarousel";
+import { getProductPriceInfo as getSharedPriceInfo } from "../../utils/price";
 
 
 const LUXURY_EASE = [0.22, 1, 0.36, 1];
@@ -124,32 +125,10 @@ function resolveImages(product) {
   return MOCK_PRODUCT.imageUrls;
 }
 
+// Dùng công thức giá dùng chung của toàn hệ thống (utils/price).
 function getProductPriceInfo(product, flashSale) {
   if (!product) return {};
-
-  if (flashSale?.items) {
-    const saleItem = flashSale.items.find((item) => item.productId === product.productId);
-    if (saleItem && saleItem.soldCount < saleItem.quantity) {
-      return {
-        finalPrice: saleItem.flashSalePrice,
-        originalPrice: product.price,
-        discountPercent: Math.round(((product.price - saleItem.flashSalePrice) / product.price) * 100),
-        isFlashSale: true,
-        maxAvailable: saleItem.quantity - saleItem.soldCount,
-      };
-    }
-  }
-
-  const discount = Number(product.discount || 0);
-  const finalPrice = discount > 0 ? product.price * (1 - discount / 100) : product.price;
-
-  return {
-    finalPrice,
-    originalPrice: product.price,
-    discountPercent: discount,
-    isFlashSale: false,
-    maxAvailable: product.quantity,
-  };
+  return getSharedPriceInfo(product, flashSale);
 }
 
 function ProductDetailSkeleton() {
