@@ -21,6 +21,7 @@ public interface OrderRepository extends JpaRepository<Order, String> {
 
 	long countByIsOrderTrue();
 	long countByIsOrderTrueAndOrderDateBefore(LocalDateTime date);
+	long countByIsOrderTrueAndOrderDateBetween(LocalDateTime startDate, LocalDateTime endDate);
 
 	@Query("SELECT o.orderStatus, COUNT(o) FROM Order o " +
 			"WHERE o.isOrder = true " +
@@ -82,7 +83,9 @@ public interface OrderRepository extends JpaRepository<Order, String> {
 	@Query("SELECT HOUR(o.orderDate) as hour, COUNT(o) as count " +
 			"FROM Order o " +
 			"WHERE o.isOrder = true " +
+			"AND o.orderDate BETWEEN :startDate AND :endDate " +
 			"GROUP BY HOUR(o.orderDate) " +
 			"ORDER BY HOUR(o.orderDate) ASC")
-	List<Object[]> findOrdersByHour();
+	List<Object[]> findOrdersByHour(@Param("startDate") LocalDateTime startDate,
+									@Param("endDate") LocalDateTime endDate);
 }

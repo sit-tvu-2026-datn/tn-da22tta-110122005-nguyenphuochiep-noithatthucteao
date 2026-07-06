@@ -52,13 +52,6 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         stats.put("totalUsers", totalUsersNow);
         stats.put("userGrowth", userGrowth);
 
-        long totalOrdersNow = orderRepository.countByIsOrderTrue();
-        long totalOrdersLastWeek = orderRepository.countByIsOrderTrueAndOrderDateBefore(sevenDaysAgo);
-        double orderGrowth = calculateGrowth(totalOrdersNow, totalOrdersLastWeek);
-
-        stats.put("newOrders", totalOrdersNow);
-        stats.put("orderGrowth", orderGrowth);
-
         YearMonth currentMonth = YearMonth.now();
         LocalDateTime startOfThisMonth = currentMonth.atDay(1).atStartOfDay();
         LocalDateTime endOfThisMonth = currentMonth.atEndOfMonth().atTime(23, 59, 59);
@@ -66,6 +59,14 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         YearMonth lastMonth = currentMonth.minusMonths(1);
         LocalDateTime startOfLastMonth = lastMonth.atDay(1).atStartOfDay();
         LocalDateTime endOfLastMonth = lastMonth.atEndOfMonth().atTime(23, 59, 59);
+
+        // Đơn hàng mới: tính theo tháng này, tăng trưởng so với tháng trước
+        long ordersThisMonth = orderRepository.countByIsOrderTrueAndOrderDateBetween(startOfThisMonth, endOfThisMonth);
+        long ordersLastMonth = orderRepository.countByIsOrderTrueAndOrderDateBetween(startOfLastMonth, endOfLastMonth);
+        double orderGrowth = calculateGrowth(ordersThisMonth, ordersLastMonth);
+
+        stats.put("newOrders", ordersThisMonth);
+        stats.put("orderGrowth", orderGrowth);
 
         BigDecimal revenueThisMonth = orderRepository.sumRevenueByDateRange(startOfThisMonth, endOfThisMonth);
         BigDecimal revenueLastMonth = orderRepository.sumRevenueByDateRange(startOfLastMonth, endOfLastMonth);
@@ -156,11 +157,21 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         return response;
     }
 
+    // Khoảng thời gian đầu tháng này -> hết tháng này (dùng chung cho các thống kê "tháng này")
+    private LocalDateTime[] currentMonthRange() {
+        YearMonth currentMonth = YearMonth.now();
+        return new LocalDateTime[]{
+                currentMonth.atDay(1).atStartOfDay(),
+                currentMonth.atEndOfMonth().atTime(23, 59, 59)
+        };
+    }
+
     @Override
     public List<Map<String, Object>> getTopSellingProducts() {
-        // Lấy Top 5 sản phẩm
+        // Lấy Top 5 sản phẩm bán chạy trong tháng này
         Pageable topFive = PageRequest.of(0, 5);
-        List<Object[]> results = orderDetailRepository.findTopSellingProducts(topFive);
+        LocalDateTime[] range = currentMonthRange();
+        List<Object[]> results = orderDetailRepository.findTopSellingProducts(range[0], range[1], topFive);
 
         List<Map<String, Object>> stats = new ArrayList<>();
         for (Object[] result : results) {
@@ -293,7 +304,8 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
 
     @Override
     public List<Map<String, Object>> getPeakHoursStats() {
-        List<Object[]> results = orderRepository.findOrdersByHour();
+        LocalDateTime[] range = currentMonthRange();
+        List<Object[]> results = orderRepository.findOrdersByHour(range[0], range[1]);
         // Tạo map mặc định 0-23h đều bằng 0
         Map<Integer, Long> hourMap = new HashMap<>();
         for (int i = 0; i < 24; i++) hourMap.put(i, 0L);

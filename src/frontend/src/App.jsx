@@ -18,6 +18,7 @@ import SlideshowManager from "./pages/admin/SlideshowManager";
 import Home from "./pages/user/Home";
 import Login from "./pages/user/Login";
 import Register from "./pages/user/Register";
+import ForgotPassword from "./pages/user/ForgotPassword";
 import LoginSuccess from "./pages/user/LoginSuccess";
 import RoomPlanner from "./components/RoomPlanner";
 
@@ -40,6 +41,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/login/success" element={<LoginSuccess />} />
         <Route path="/room-planner" element={<RoomPlanner />} />
 

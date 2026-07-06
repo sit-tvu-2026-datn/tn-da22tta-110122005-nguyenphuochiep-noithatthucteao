@@ -9,4 +9,16 @@ public interface EmailService {
      * Thực hiện bất đồng bộ, nuốt mọi lỗi (chỉ ghi log) để KHÔNG ảnh hưởng đơn hàng.
      */
     void sendOrderConfirmationEmail(String orderId);
+
+    /**
+     * Gửi email chứa mã OTP đặt lại mật khẩu.
+     *
+     * KHÁC với email đơn hàng: chạy ĐỒNG BỘ và NÉM lỗi ra ngoài để lớp gọi
+     * (PasswordResetService) biết email có gửi được hay không mà báo cho người dùng.
+     *
+     * @param toEmail email người nhận
+     * @param toName  tên hiển thị (có thể null)
+     * @param otp     mã OTP 6 chữ số
+     */
+    void sendPasswordResetEmail(String toEmail, String toName, String otp);
 }

@@ -9,6 +9,10 @@ import {
 import * as THREE from "three";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../config/api";
+import { THEME, ON_PRIMARY } from "./roomPlanner/theme";
+import ProductCard from "./roomPlanner/ProductCard";
+import CategoryTabs from "./roomPlanner/CategoryTabs";
+import SearchBar from "./roomPlanner/SearchBar";
 
 /* ─────────────────── EMOJI MAPPER ─────────────────── */
 
@@ -788,6 +792,10 @@ export default function RoomPlanner() {
   const [objects, setObjects] = useState([]);
   const [viewMode, setViewMode] = useState("exterior");
   const [sidebarTab, setSidebarTab] = useState("room");
+  // UX: collapsible left sidebar + bottom catalog panel, and product search.
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [bottomCollapsed, setBottomCollapsed] = useState(false);
+  const [search, setSearch] = useState("");
   const controlsRef = useRef();
 
   // Load catalog on mount
@@ -803,6 +811,15 @@ export default function RoomPlanner() {
               id: prod.id || prod.productId,
               name: prod.name || prod.productName,
               modelUrl: prod.modelUrl || prod.arLink,
+              image:
+                (prod.imageUrls && prod.imageUrls[0]) ||
+                prod.image ||
+                prod.imageUrl ||
+                prod.thumbnail ||
+                null,
+              price: prod.price != null ? Number(prod.price) : null,
+              discount: prod.discount != null ? Number(prod.discount) : null,
+              size: prod.size || null,
               width: Number(prod.width) || 80,
               height: Number(prod.height) || 75,
               length: Number(prod.length) || 120,
@@ -930,8 +947,14 @@ export default function RoomPlanner() {
         Mobile rows fold the iOS safe-area insets into the track sizes so the
         topbar/bottom-nav clear the notch & home indicator without overflowing. ── */
   const SIDEBAR_W = isTablet ? 280 : 320;
+  const SIDEBAR_COLLAPSED_W = 60;
   const TOPBAR_H = isMobile ? 52 : 56;
-  const BOTTOM_H = isTablet ? 134 : 150;
+  // Bottom catalog bar is tall (shows a grid of vertical product cards) →
+  // collapsible. Height fits one full row (card 340 + grid & header padding).
+  const BOTTOM_H = isTablet ? 452 : 476;
+  const BOTTOM_COLLAPSED_H = 56;
+  const sidebarW = leftCollapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_W;
+  const bottomH = bottomCollapsed ? BOTTOM_COLLAPSED_H : BOTTOM_H;
   const layoutStyle = isMobile
     ? {
         gridTemplateRows: `calc(${TOPBAR_H}px + env(safe-area-inset-top)) 1fr calc(64px + env(safe-area-inset-bottom))`,
@@ -939,10 +962,20 @@ export default function RoomPlanner() {
         gridTemplateAreas: '"topbar" "canvas" "bottom"',
       }
     : {
-        gridTemplateRows: `${TOPBAR_H}px 1fr ${BOTTOM_H}px`,
-        gridTemplateColumns: `${SIDEBAR_W}px 1fr`,
+        gridTemplateRows: `${TOPBAR_H}px 1fr ${bottomH}px`,
+        gridTemplateColumns: `${sidebarW}px 1fr`,
         gridTemplateAreas: '"topbar topbar" "sidebar canvas" "bottom bottom"',
+        // Smoothly animate both collapses via the grid tracks (300ms).
+        transition:
+          "grid-template-rows 300ms ease, grid-template-columns 300ms ease",
       };
+
+  // Tab icons kept visible in the collapsed sidebar rail.
+  const railTabs = [
+    { id: "room", icon: "📐", label: "Phòng" },
+    { id: "tools", icon: "🎮", label: "Công cụ" },
+    { id: "objects", icon: "📦", label: "Vật thể", badge: objects.length },
+  ];
 
   // Open the control panel (mobile drawer) focused on a given tab.
   const openPanel = (tab) => {
@@ -1156,79 +1189,77 @@ export default function RoomPlanner() {
     );
   };
 
-  /* ── Product catalog. Desktop/tablet → horizontal scroll bar; mobile sheet →
-        2-column grid (no horizontal scroll, larger tap targets). ── */
-  const catalogPanel = (dense) => (
-    <div className="flex flex-col min-h-0 h-full overflow-hidden">
-      {/* Category tabs */}
-      <div className="flex items-center border-b border-amber-900/30 shrink-0 px-1 min-h-[42px] overflow-x-auto r3d-scroll">
-        {loading ? (
-          <div className="px-4 py-2 text-sm text-stone-500 flex items-center gap-2">
-            <span className="animate-spin text-amber-500 text-sm">⌛</span> Đang tải danh mục...
-          </div>
-        ) : (
-          categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat)}
-              className={`flex items-center gap-1.5 px-4 ${dense ? "py-2.5" : "py-3 min-h-[44px]"} text-sm font-medium border-b-2 -mb-px transition-all shrink-0 whitespace-nowrap ${
-                selectedCategory?.id === cat.id
-                  ? "text-amber-400 border-amber-400"
-                  : "text-stone-500 border-transparent hover:text-stone-300"
-              }`}
-            >
-              {cat.icon} {cat.name}
-            </button>
-          ))
-        )}
-        {dense && (
-          <>
-            <div className="flex-1" />
-            <span className="pr-3 text-[10.5px] text-stone-600 shrink-0 whitespace-nowrap">Click sản phẩm để thêm vào phòng</span>
-          </>
-        )}
-      </div>
+  /* ── Product catalog ──────────────────────────────────────────────────────
+        Products of the selected category, filtered by the search query. Cards
+        are vertical (asset-browser style); the grid auto-fills as many 220px
+        columns as fit, with a 20px gutter. ── */
+  const filteredProducts = useMemo(() => {
+    const list = selectedCategory?.products || [];
+    const q = search.trim().toLowerCase();
+    return q ? list.filter((p) => (p.name || "").toLowerCase().includes(q)) : list;
+  }, [selectedCategory, search]);
 
-      {/* Product cards */}
+  const handleAddProduct = (product) => {
+    addProduct(product);
+    if (isMobile) setCatalogOpen(false);
+  };
+
+  // Responsive auto-fill product grid — shared by the bottom bar and mobile sheet.
+  const renderProductGrid = () => (
+    <div
+      className="flex-1 min-h-0 overflow-y-auto r3d-scroll"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+        gap: 20,
+        padding: 20,
+        alignContent: "start",
+      }}
+    >
+      {loading ? (
+        Array.from({ length: 8 }).map((_, n) => (
+          <div
+            key={n}
+            className="rounded-2xl border animate-pulse"
+            style={{ height: 340, background: THEME.panel, borderColor: THEME.border }}
+          />
+        ))
+      ) : filteredProducts.length > 0 ? (
+        filteredProducts.map((product) => (
+          <ProductCard
+            key={product.id}
+            product={product}
+            categoryName={selectedCategory?.name}
+            onAdd={handleAddProduct}
+          />
+        ))
+      ) : (
+        <div
+          className="col-span-full text-center py-8 text-sm"
+          style={{ color: THEME.secondary }}
+        >
+          {search ? "Không tìm thấy sản phẩm phù hợp" : "Không có sản phẩm nào"}
+        </div>
+      )}
+    </div>
+  );
+
+  // Mobile catalog (inside the bottom sheet): categories + search + grid.
+  const catalogSheet = (
+    <div className="flex flex-col min-h-0 h-full">
       <div
-        className={
-          dense
-            ? "flex-1 flex gap-2.5 px-3.5 py-2.5 overflow-x-auto items-center r3d-scroll"
-            : "flex-1 min-h-0 grid grid-cols-2 gap-3 px-4 py-4 overflow-y-auto r3d-scroll content-start"
-        }
+        className="px-4 pt-1 pb-2.5 shrink-0 flex flex-col gap-2.5 border-b"
+        style={{ borderColor: THEME.border }}
       >
-        {loading ? (
-          (dense ? [1, 2, 3] : [1, 2, 3, 4]).map((n) => (
-            <div key={n} className={`${dense ? "shrink-0 w-32 h-24" : "h-28"} rounded-xl border border-amber-900/10 p-2.5 animate-pulse bg-stone-900/30 flex flex-col justify-between`}>
-              <div className="h-14 rounded-lg bg-stone-800/40" />
-              <div className="h-3 rounded bg-stone-800 w-3/4" />
-            </div>
-          ))
-        ) : selectedCategory?.products && selectedCategory.products.length > 0 ? (
-          selectedCategory.products.map((product) => (
-            <div
-              key={product.id}
-              onClick={() => {
-                addProduct(product);
-                if (isMobile) setCatalogOpen(false);
-              }}
-              className={`${dense ? "shrink-0 w-32" : "w-full"} rounded-xl border border-amber-900/25 p-2.5 cursor-pointer transition-all hover:-translate-y-1 hover:border-amber-600/50 hover:shadow-xl active:scale-[.98] relative overflow-hidden group`}
-              style={{ background: "linear-gradient(160deg,rgba(74,62,48,.4),rgba(26,20,16,.8))" }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-400/[.07] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="h-14 rounded-lg border border-amber-900/25 flex items-center justify-center text-2xl mb-2 relative"
-                   style={{ background: "linear-gradient(135deg,rgba(74,62,48,.4),rgba(26,20,16,.7))" }}>
-                🪑
-                <span className="absolute bottom-1 right-1 text-[8px] font-bold text-amber-400 bg-amber-400/10 px-1 rounded">3D</span>
-              </div>
-              <div className="text-[13px] font-semibold text-white truncate" title={product.name}>{product.name}</div>
-              <div className="text-[11px] text-stone-500 mt-0.5">+ Thêm vào phòng</div>
-            </div>
-          ))
-        ) : (
-          <div className="text-stone-500 text-sm px-2.5 py-4">Không có sản phẩm nào</div>
-        )}
+        <CategoryTabs
+          categories={categories}
+          selectedId={selectedCategory?.id}
+          onSelect={setSelectedCategory}
+          loading={loading}
+        />
+        <SearchBar value={search} onChange={setSearch} />
       </div>
+      {renderProductGrid()}
     </div>
   );
 
@@ -1279,7 +1310,7 @@ export default function RoomPlanner() {
         height: "100dvh",
         display: "grid",
         ...layoutStyle,
-        background: "#1a1410",
+        background: THEME.bg,
         fontFamily: "'DM Sans', sans-serif",
       }}
     >
@@ -1348,13 +1379,84 @@ export default function RoomPlanner() {
         </div>
       </header>
 
-      {/* ── SIDEBAR (tablet / desktop) — same control panel as the mobile drawer ── */}
+      {/* ── SIDEBAR (tablet / desktop) — collapsible. The full control panel
+             stays MOUNTED at all times (fades/slides out on collapse) so no
+             component ever remounts; a compact icon rail cross-fades in. ── */}
       {!isMobile && (
         <aside
-          style={{ gridArea: "sidebar" }}
-          className="flex flex-col border-r border-amber-900/30 bg-stone-950/95 overflow-hidden"
+          style={{ gridArea: "sidebar", background: THEME.panel, borderColor: THEME.border }}
+          className="relative flex flex-col border-r overflow-hidden"
         >
-          {controlPanel(true)}
+          {/* Full control panel (always mounted) */}
+          <div
+            className="absolute inset-y-0 left-0 flex flex-col"
+            style={{
+              width: SIDEBAR_W,
+              opacity: leftCollapsed ? 0 : 1,
+              transform: leftCollapsed ? "translateX(-12px)" : "translateX(0)",
+              pointerEvents: leftCollapsed ? "none" : "auto",
+              transition: "opacity 300ms ease, transform 300ms ease",
+            }}
+          >
+            {controlPanel(true)}
+          </div>
+
+          {/* Collapsed rail — keeps only the tab icons */}
+          <div
+            className="absolute inset-y-0 left-0 flex flex-col items-center pt-3 gap-2"
+            style={{
+              width: SIDEBAR_COLLAPSED_W,
+              opacity: leftCollapsed ? 1 : 0,
+              pointerEvents: leftCollapsed ? "auto" : "none",
+              transition: "opacity 300ms ease",
+            }}
+          >
+            {railTabs.map((tb) => {
+              const active = sidebarTab === tb.id;
+              return (
+                <button
+                  key={tb.id}
+                  onClick={() => {
+                    setSidebarTab(tb.id);
+                    setLeftCollapsed(false);
+                  }}
+                  title={tb.label}
+                  className="relative w-10 h-10 flex items-center justify-center rounded-lg text-lg transition-all hover:brightness-110"
+                  style={
+                    active
+                      ? { background: THEME.primary, color: ON_PRIMARY }
+                      : { background: THEME.card, color: THEME.secondary }
+                  }
+                >
+                  {tb.icon}
+                  {tb.badge ? (
+                    <span
+                      className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center"
+                      style={{ background: THEME.primary, color: ON_PRIMARY }}
+                    >
+                      {tb.badge}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Toggle — sits on the sidebar's right edge */}
+          <button
+            onClick={() => setLeftCollapsed((v) => !v)}
+            aria-label={leftCollapsed ? "Mở rộng bảng điều khiển" : "Thu gọn bảng điều khiển"}
+            title={leftCollapsed ? "Mở rộng" : "Thu gọn"}
+            className="absolute top-1/2 right-0 -translate-y-1/2 z-20 w-6 h-14 flex items-center justify-center rounded-r-lg text-sm font-bold transition-all hover:brightness-125"
+            style={{
+              background: THEME.card,
+              border: `1px solid ${THEME.border}`,
+              borderLeft: "none",
+              color: THEME.primary,
+            }}
+          >
+            {leftCollapsed ? "›" : "‹"}
+          </button>
         </aside>
       )}
 
@@ -1466,12 +1568,48 @@ export default function RoomPlanner() {
         </Canvas>
       </div>
 
-      {/* ── BOTTOM: catalog bar (tablet/desktop) · bottom-nav (mobile) ── */}
+      {/* ── BOTTOM: catalog bar (tablet/desktop) · bottom-nav (mobile) ──
+             The category row + collapse toggle stay pinned at the top; the
+             search + product grid below are clipped away when collapsed
+             (row height animates via the grid, 300ms). ── */}
       {isMobile ? (
         bottomNav
       ) : (
-        <div style={{ gridArea: "bottom" }} className="overflow-hidden border-t border-amber-900/30 bg-stone-950/98">
-          {catalogPanel(true)}
+        <div
+          style={{ gridArea: "bottom", background: THEME.panel, borderColor: THEME.border }}
+          className="flex flex-col overflow-hidden border-t"
+        >
+          {/* Header — categories (always visible) + collapse toggle */}
+          <div
+            className="flex items-center gap-2 px-3 shrink-0 border-b"
+            style={{ height: 50, borderColor: THEME.border }}
+          >
+            <div className="flex-1 min-w-0">
+              <CategoryTabs
+                categories={categories}
+                selectedId={selectedCategory?.id}
+                onSelect={setSelectedCategory}
+                loading={loading}
+              />
+            </div>
+            <button
+              onClick={() => setBottomCollapsed((v) => !v)}
+              aria-label={bottomCollapsed ? "Mở rộng danh sách" : "Thu gọn danh sách"}
+              title={bottomCollapsed ? "Mở rộng" : "Thu gọn"}
+              className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all hover:brightness-125"
+              style={{ background: THEME.card, border: `1px solid ${THEME.border}`, color: THEME.primary }}
+            >
+              {bottomCollapsed ? "▲" : "▼"}
+            </button>
+          </div>
+
+          {/* Body — search + responsive product grid (clipped when collapsed) */}
+          <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
+            <div className="px-5 pt-3 pb-1 shrink-0" style={{ maxWidth: 400 }}>
+              <SearchBar value={search} onChange={setSearch} />
+            </div>
+            {renderProductGrid()}
+          </div>
         </div>
       )}
 
@@ -1482,7 +1620,7 @@ export default function RoomPlanner() {
             {controlPanel(false)}
           </Drawer>
           <BottomSheet open={catalogOpen} onClose={() => setCatalogOpen(false)} title="Thêm nội thất">
-            {catalogPanel(false)}
+            {catalogSheet}
           </BottomSheet>
         </>
       )}

@@ -23,12 +23,98 @@ const GREETING = {
   sender: "bot",
 };
 
+const FAB_SIZE = 64; // kích thước nút (w-16/h-16)
+const EDGE_MARGIN = 24; // khoảng cách tối thiểu tới biên
+const POS_STORAGE_KEY = "chat_fab_pos";
+
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [inputMsg, setInputMsg] = useState("");
   const messagesEndRef = useRef(null);
+
+  // --- Vị trí & kéo-thả cho nút chatbot nổi ---
+  const [fabPos, setFabPos] = useState(() => {
+    try {
+      const saved = localStorage.getItem(POS_STORAGE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // bỏ qua
+    }
+    return null; // null = dùng vị trí mặc định (góc dưới phải)
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef({ active: false, moved: false, offsetX: 0, offsetY: 0 });
+
+  const clampToViewport = (x, y) => {
+    const maxX = window.innerWidth - FAB_SIZE - EDGE_MARGIN;
+    const maxY = window.innerHeight - FAB_SIZE - EDGE_MARGIN;
+    return {
+      x: Math.min(Math.max(x, EDGE_MARGIN), maxX),
+      y: Math.min(Math.max(y, EDGE_MARGIN), maxY),
+    };
+  };
+
+  // Giữ nút trong khung nhìn khi resize
+  useEffect(() => {
+    const onResize = () => {
+      setFabPos((prev) => (prev ? clampToViewport(prev.x, prev.y) : prev));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const handleFabPointerDown = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragRef.current = {
+      active: true,
+      moved: false,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+    };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+
+  const handleFabPointerMove = (e) => {
+    if (!dragRef.current.active) return;
+    const x = e.clientX - dragRef.current.offsetX;
+    const y = e.clientY - dragRef.current.offsetY;
+    dragRef.current.moved = true;
+    setIsDragging(true);
+    setFabPos(clampToViewport(x, y));
+  };
+
+  const handleFabPointerUp = (e) => {
+    if (!dragRef.current.active) return;
+    dragRef.current.active = false;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+
+    if (!dragRef.current.moved) {
+      // Là một cú click -> mở chat
+      setIsDragging(false);
+      setIsOpen(true);
+      return;
+    }
+
+    // Snap về biên trái hoặc phải gần nhất
+    setFabPos((prev) => {
+      if (!prev) return prev;
+      const center = prev.x + FAB_SIZE / 2;
+      const snappedX =
+        center < window.innerWidth / 2
+          ? EDGE_MARGIN
+          : window.innerWidth - FAB_SIZE - EDGE_MARGIN;
+      const next = clampToViewport(snappedX, prev.y);
+      try {
+        localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // bỏ qua
+      }
+      return next;
+    });
+    setIsDragging(false);
+  };
 
   const [messages, setMessages] = useState(() => {
     try {
@@ -229,8 +315,21 @@ export default function Chatbot() {
           </div>
         </div>
       </div>
-      <div className={`fixed bottom-6 right-6 z-50 transition-all duration-500 ${!isOpen ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-50 rotate-90 pointer-events-none"}`}>
-        <button onClick={() => setIsOpen(true)} className="group relative flex items-center justify-center w-16 h-16 bg-blue-600 hover:bg-blue-700 rounded-full shadow-[0_8px_30px_rgb(37,99,235,0.3)] border-4 border-white transition-all duration-300 active:scale-95">
+      <div
+        className={`fixed z-50 ${isDragging ? "" : "transition-all duration-500"} ${!isOpen ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-50 rotate-90 pointer-events-none"}`}
+        style={
+          fabPos
+            ? { left: fabPos.x, top: fabPos.y, right: "auto", bottom: "auto" }
+            : { right: 24, bottom: 24 }
+        }
+      >
+        <button
+          onPointerDown={handleFabPointerDown}
+          onPointerMove={handleFabPointerMove}
+          onPointerUp={handleFabPointerUp}
+          title="Kéo để di chuyển • Nhấn để mở chat"
+          className={`group relative flex items-center justify-center w-16 h-16 bg-blue-600 hover:bg-blue-700 rounded-full shadow-[0_8px_30px_rgb(37,99,235,0.3)] border-4 border-white transition-transform duration-300 active:scale-95 touch-none ${isDragging ? "cursor-grabbing scale-110" : "cursor-grab"}`}
+        >
           <MessageCircle size={30} className="text-white" strokeWidth={1.5} />
           <span className="absolute top-0 right-0 flex h-3.5 w-3.5 -mt-1 -mr-1"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500 border-2 border-white"></span></span>
         </button>

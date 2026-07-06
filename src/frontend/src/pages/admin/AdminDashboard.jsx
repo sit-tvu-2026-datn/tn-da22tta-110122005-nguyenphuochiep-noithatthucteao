@@ -122,7 +122,13 @@ export default function AdminDashboard() {
     async (start, end) => {
       setStatusLoading(true);
       try {
-        const url = `${BASE_URL}/orders/status?startDate=${start.toISOString()}&endDate=${end.toISOString()}`;
+        // Gửi theo giờ địa phương (không dùng toISOString vì backend lưu orderDate
+        // bằng LocalDateTime giờ VN; toISOString chuyển sang UTC làm lệch -7h,
+        // khiến các đơn mới trong ngày bị loại khỏi khoảng lọc).
+        const fmt = "YYYY-MM-DDTHH:mm:ss";
+        const url = `${BASE_URL}/orders/status?startDate=${start.format(
+          fmt
+        )}&endDate=${end.format(fmt)}`;
         const res = await api.get(url);
 
         if (res.data) {
@@ -508,7 +514,7 @@ export default function AdminDashboard() {
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <StatCard
-            title="Khách Hàng"
+            title="Tổng Khách Hàng"
             value={kpiData.totalUsers}
             growth={kpiData.userGrowth}
             icon={<UsergroupAddOutlined className="text-2xl" />}

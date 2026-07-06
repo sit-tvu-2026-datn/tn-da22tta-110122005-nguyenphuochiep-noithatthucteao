@@ -85,7 +85,7 @@ public class BrevoEmailService implements EmailService {
 
             String paymentMethodName = resolvePaymentMethodName(order);
             String html = templateBuilder.buildOrderConfirmation(order, user, paymentMethodName, brevoConfig);
-            String subject = "🎉 Xác nhận đơn hàng #" + order.getOrderId() + " - Interior Shop";
+            String subject = "🎉 Xác nhận đơn hàng #" + order.getOrderId() + " - NPH Shop";
 
             sendEmail(toEmail, user.getFullName(), subject, html);
             log.info("Đã gửi email xác nhận đơn hàng {} tới {}.", orderId, toEmail);
@@ -93,6 +93,24 @@ public class BrevoEmailService implements EmailService {
             // Nuốt mọi lỗi: không rollback đơn hàng, không crash server.
             log.error("Gửi email xác nhận đơn hàng {} thất bại: {}", orderId, e.getMessage(), e);
         }
+    }
+
+    /** TTL của OTP hiển thị trong email (đồng bộ với PasswordResetService). */
+    private static final int OTP_TTL_MINUTES = 10;
+
+    /**
+     * Gửi email OTP đặt lại mật khẩu — ĐỒNG BỘ, NÉM lỗi ra ngoài để lớp gọi biết
+     * kết quả (không @Async, không nuốt lỗi như email đơn hàng).
+     */
+    @Override
+    public void sendPasswordResetEmail(String toEmail, String toName, String otp) {
+        if (brevoConfig.getApiKey() == null || brevoConfig.getApiKey().isBlank()) {
+            throw new IllegalStateException("BREVO_API_KEY chưa được cấu hình, không thể gửi email OTP.");
+        }
+        String html = templateBuilder.buildPasswordResetOtp(toName, otp, OTP_TTL_MINUTES, brevoConfig);
+        String subject = "🔐 Mã đặt lại mật khẩu NPH Shop: " + otp;
+        sendEmail(toEmail, toName, subject, html);
+        log.info("Đã gửi email OTP đặt lại mật khẩu tới {}.", toEmail);
     }
 
     /** Lấy tên phương thức thanh toán để hiển thị trong email. */
@@ -129,7 +147,7 @@ public class BrevoEmailService implements EmailService {
 
         Map<String, Object> body = new HashMap<>();
         body.put("sender", Map.of(
-                "name", brevoConfig.getSenderName() != null ? brevoConfig.getSenderName() : "Interior Shop",
+                "name", brevoConfig.getSenderName() != null ? brevoConfig.getSenderName() : "NPH Shop",
                 "email", brevoConfig.getSenderEmail()));
         body.put("to", List.of(Map.of(
                 "email", toEmail,

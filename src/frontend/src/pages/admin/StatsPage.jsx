@@ -254,7 +254,7 @@ export default function StatsPage() {
             }
             bordered={false}
             className="shadow-md rounded-xl"
-            extra={<Tag color="blue">{chartData.length} mốc thời gian</Tag>}
+            extra={<Tag color="blue">{chartData.length} ngày</Tag>}
           >
             <Spin spinning={loading}>
               <div style={{ height: 400, width: "100%" }}>

@@ -101,7 +101,7 @@ public class EmailTemplateBuilder {
   <tr>
     <td style="background:linear-gradient(135deg,%s,%s); padding:40px 32px; text-align:center;">
       <div style="display:inline-block; background-color:rgba(255,255,255,0.15); border-radius:999px; padding:8px 20px; margin-bottom:16px;">
-        <span style="color:#FFFFFF; font-size:15px; font-weight:600; letter-spacing:2px;">🛋️ INTERIOR SHOP</span>
+        <span style="color:#FFFFFF; font-size:15px; font-weight:600; letter-spacing:2px;">🛋️ NPH SHOP</span>
       </div>
       <h1 style="margin:8px 0 6px; color:#FFFFFF; font-size:26px; font-weight:700;">🎉 Cảm ơn bạn đã mua hàng!</h1>
       <p style="margin:0; color:#FDF6EF; font-size:15px;">Đơn hàng của bạn đã được xác nhận thành công.</p>
@@ -149,15 +149,15 @@ public class EmailTemplateBuilder {
   <!-- ===== FOOTER ===== -->
   <tr>
     <td style="background-color:#FBF8F4; padding:28px 32px; text-align:center; border-top:1px solid %s;">
-      <p style="margin:0 0 6px; font-size:15px; color:%s; font-weight:600;">Cảm ơn bạn đã tin tưởng Interior Shop 💛</p>
+      <p style="margin:0 0 6px; font-size:15px; color:%s; font-weight:600;">Cảm ơn bạn đã tin tưởng NPH Shop 💛</p>
       <p style="margin:0 0 16px; font-size:13px; color:%s;">Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ với chúng tôi.</p>
       <p style="margin:0; font-size:13px; color:%s; line-height:1.9;">
         📞 Hotline: <strong style="color:%s;">%s</strong><br>
         ✉️ Email: <a href="mailto:%s" style="color:%s; text-decoration:none;">%s</a><br>
-        📘 Facebook: <a href="%s" style="color:%s; text-decoration:none;">Interior Shop</a><br>
+        📘 Facebook: <a href="%s" style="color:%s; text-decoration:none;">NPH Shop</a><br>
         🌐 Website: <a href="%s" style="color:%s; text-decoration:none;">%s</a>
       </p>
-      <p style="margin:18px 0 0; font-size:11px; color:#B7ADA1;">© 2026 Interior Shop. All rights reserved.</p>
+      <p style="margin:18px 0 0; font-size:11px; color:#B7ADA1;">© 2026 NPH Shop. All rights reserved.</p>
     </td>
   </tr>
 
@@ -186,6 +186,104 @@ public class EmailTemplateBuilder {
                 escape(cfg.getShopEmail()), BRAND_DARK, escape(cfg.getShopEmail()),
                 escape(cfg.getShopFacebook()), BRAND_DARK,
                 escape(cfg.getShopWebsite()), BRAND_DARK, escape(cfg.getShopWebsite())
+        );
+    }
+
+    /**
+     * Dựng HTML email chứa mã OTP đặt lại mật khẩu.
+     *
+     * @param name  tên khách hàng (fallback "Quý khách")
+     * @param otp   mã OTP 6 chữ số
+     * @param ttlMinutes số phút OTP còn hiệu lực
+     * @param cfg   cấu hình Brevo (thông tin liên hệ + URL frontend)
+     */
+    public String buildPasswordResetOtp(String name, String otp, int ttlMinutes, BrevoConfig cfg) {
+        String safeName = (name == null || name.isBlank()) ? "Quý khách" : escape(name);
+        // Tách từng chữ số ra ô riêng cho dễ đọc.
+        StringBuilder digits = new StringBuilder();
+        for (char c : otp.toCharArray()) {
+            digits.append("""
+              <span style="display:inline-block; min-width:44px; margin:0 4px; padding:14px 0; background-color:#FBF8F4; border:1px solid %s; border-radius:10px; font-size:28px; font-weight:800; color:%s; letter-spacing:2px;">%s</span>"""
+                    .formatted(BORDER, BRAND_DARK, c));
+        }
+
+        return """
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đặt lại mật khẩu</title>
+</head>
+<body style="margin:0; padding:0; background-color:%s; font-family:'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing:antialiased;">
+<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background-color:%s; padding:24px 12px;">
+<tr>
+<td align="center">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px; max-width:600px; background-color:#FFFFFF; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.08);">
+
+  <!-- HEADER -->
+  <tr>
+    <td style="background:linear-gradient(135deg,%s,%s); padding:40px 32px; text-align:center;">
+      <div style="display:inline-block; background-color:rgba(255,255,255,0.15); border-radius:999px; padding:8px 20px; margin-bottom:16px;">
+        <span style="color:#FFFFFF; font-size:15px; font-weight:600; letter-spacing:2px;">🛋️ NPH SHOP</span>
+      </div>
+      <h1 style="margin:8px 0 6px; color:#FFFFFF; font-size:26px; font-weight:700;">🔐 Đặt lại mật khẩu</h1>
+      <p style="margin:0; color:#FDF6EF; font-size:15px;">Yêu cầu đặt lại mật khẩu cho tài khoản của bạn.</p>
+    </td>
+  </tr>
+
+  <!-- BODY -->
+  <tr>
+    <td style="padding:32px 32px 8px;">
+      <p style="margin:0 0 14px; font-size:15px; color:%s;">Xin chào <strong style="color:%s;">%s</strong>,</p>
+      <p style="margin:0 0 24px; font-size:14px; color:%s; line-height:1.7;">
+        Chúng tôi nhận được yêu cầu đặt lại mật khẩu. Vui lòng dùng mã xác thực (OTP) bên dưới để tiếp tục.
+        Mã có hiệu lực trong <strong style="color:%s;">%d phút</strong>.
+      </p>
+      <div style="text-align:center; margin:8px 0 24px;">
+        %s
+      </div>
+      <div style="background-color:#FBF8F4; border:1px solid %s; border-radius:12px; padding:16px 20px; margin-bottom:8px;">
+        <p style="margin:0; font-size:13px; color:%s; line-height:1.7;">
+          ⚠️ <strong style="color:%s;">Không chia sẻ mã này</strong> với bất kỳ ai. Nếu bạn không yêu cầu đặt lại mật khẩu,
+          hãy bỏ qua email này — mật khẩu của bạn vẫn được giữ nguyên an toàn.
+        </p>
+      </div>
+    </td>
+  </tr>
+
+  <!-- FOOTER -->
+  <tr>
+    <td style="background-color:#FBF8F4; padding:28px 32px; text-align:center; border-top:1px solid %s;">
+      <p style="margin:0 0 6px; font-size:15px; color:%s; font-weight:600;">NPH Shop 💛</p>
+      <p style="margin:0; font-size:13px; color:%s; line-height:1.9;">
+        📞 Hotline: <strong style="color:%s;">%s</strong><br>
+        ✉️ Email: <a href="mailto:%s" style="color:%s; text-decoration:none;">%s</a>
+      </p>
+      <p style="margin:18px 0 0; font-size:11px; color:#B7ADA1;">© 2026 NPH Shop. All rights reserved.</p>
+    </td>
+  </tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+</body>
+</html>
+""".formatted(
+                BG, BG,
+                BRAND, BRAND_DARK,
+                TEXT_DARK, BRAND_DARK, safeName,
+                TEXT_MUTED, BRAND_DARK, ttlMinutes,
+                digits.toString(),
+                BORDER, TEXT_MUTED, RED,
+                BORDER,
+                TEXT_DARK,
+                TEXT_MUTED,
+                BRAND_DARK, escape(cfg.getShopHotline()),
+                escape(cfg.getShopEmail()), BRAND_DARK, escape(cfg.getShopEmail())
         );
     }
 

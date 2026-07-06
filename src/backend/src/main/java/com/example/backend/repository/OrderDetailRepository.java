@@ -42,9 +42,12 @@ public interface OrderDetailRepository extends JpaRepository<OrderDetail, String
             "JOIN od.product p " +
             "JOIN od.order o " +
             "WHERE o.isOrder = true " +
+            "AND o.orderDate BETWEEN :startDate AND :endDate " +
             "GROUP BY p.productId, p.productName, p.price " +
             "ORDER BY SUM(od.quantity) DESC")
-    List<Object[]> findTopSellingProducts(Pageable pageable);
+    List<Object[]> findTopSellingProducts(@Param("startDate") LocalDateTime startDate,
+                                          @Param("endDate") LocalDateTime endDate,
+                                          Pageable pageable);
 
     @Query("SELECT od.product.productId " +
             "FROM OrderDetail od " +

@@ -11,7 +11,7 @@ export default function Footer() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 pt-16 pb-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-8">
 
           {/* Cột 1: Brand */}
           <div className="lg:col-span-1 space-y-5">
@@ -26,14 +26,7 @@ export default function Footer() {
             <p className="text-sm font-light leading-7 text-white/30 max-w-xs tracking-wide">
               Mang đến không gian sống tiện nghi, hiện đại và đẳng cấp cho ngôi
               nhà của bạn.
-            </p>
-            {/* Decorative line */}
-            <div className="flex items-center gap-2 pt-2">
-              <span className="w-8 h-px bg-champagne/40" />
-              <span className="text-[9px] font-semibold tracking-[0.3em] uppercase text-champagne/50">
-                Est. 2024
-              </span>
-            </div>
+            </p>          
           </div>
 
           {/* Cột 2: Quick Links */}
@@ -64,28 +57,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Cột 3: Policies */}
-          <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-champagne mb-6">
-              Chính Sách
-            </h3>
-            <ul className="space-y-3">
-              {[
-                "Chính sách bảo hành",
-                "Đổi trả hàng",
-                "Giao hàng & Lắp đặt",
-                "Thanh toán",
-              ].map((item) => (
-                <li key={item}>
-                  <span className="text-xs font-medium text-white/35 uppercase tracking-[0.1em] hover:text-champagne transition-colors duration-300 cursor-pointer">
-                    {item}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Cột 4: Contact */}
+          {/* Cột 3: Contact */}
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-champagne mb-6">
               Liên Hệ

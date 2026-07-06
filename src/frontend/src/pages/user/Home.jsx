@@ -5,9 +5,7 @@ import FeaturedCategories from "../../components/landing/FeaturedCategories";
 import FlashSaleSection from "../../components/landing/FlashSaleSection";
 import PersonalizedRecommendations from "../../components/PersonalizedRecommendations";
 import RecommendationCarousel from "../../components/recommend/RecommendationCarousel";
-import LifestyleSection from "../../components/landing/LifestyleSection";
 import NewArrivalsMarquee from "../../components/landing/NewArrivalsMarquee";
-import NewsletterSection from "../../components/landing/NewsletterSection";
 
 export default function Home() {
   return (
@@ -46,14 +44,8 @@ export default function Home() {
         showRating
       />
 
-      {/* 5. Lifestyle — 50/50 split image + content */}
-      <LifestyleSection />
-
-      {/* 6. New Arrivals — Auto-scrolling product marquee */}
+      {/* 5. New Arrivals — Auto-scrolling product marquee */}
       <NewArrivalsMarquee />
-
-      {/* 7. Newsletter — Dark CTA section */}
-      <NewsletterSection />
     </div>
   );
 }
