@@ -13,6 +13,7 @@ import com.example.backend.repository.UserPreferenceProfileRepository;
 import com.example.backend.repository.UserProductInteractionRepository;
 import com.example.backend.service.DiversityService;
 import com.example.backend.service.UserPreferenceService;
+import com.example.backend.util.TextTokenizer;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -46,15 +47,19 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
     private final DiversityService diversityService;
     private final ObjectMapper objectMapper;
 
-    // Trọng số từng chiều khi chấm điểm một sản phẩm
-    private static final double W_CATEGORY = 0.40;
-    private static final double W_MATERIAL = 0.30;
-    private static final double W_COLOR = 0.20;
+    // Trọng số từng chiều khi chấm điểm một sản phẩm (tổng = 1.0)
+    private static final double W_CATEGORY = 0.35;
+    private static final double W_MATERIAL = 0.25;
+    private static final double W_COLOR = 0.15;
     private static final double W_ORIGIN = 0.10;
+    private static final double W_SEARCH = 0.15;
 
     // Ngưỡng coi là "đã tương tác mạnh" -> loại khỏi gợi ý For You
     private static final double STRONG_INTERACTION = 3.0;
     private static final int MAX_CONSECUTIVE_CATEGORY = 3;
+
+    // Giới hạn số token tìm kiếm lưu trong hồ sơ để tránh JSON phình to
+    private static final int MAX_SEARCH_KEYWORDS = 50;
 
     @Override
     public UserPreferenceDTO getProfile(String userId) {
@@ -77,8 +82,17 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
         List<UserProductInteraction> interactions = interactionRepository.findByUserId(userId);
         UserPreferenceDTO dto = new UserPreferenceDTO();
 
+        // Bảo toàn chiều từ khóa tìm kiếm đã tích lũy trước đó (không bị mất khi rebuild)
+        Map<String, Double> preservedSearch = loadSearchKeywords(userId);
+        dto.setSearchKeywordScores(preservedSearch);
+
         if (interactions.isEmpty()) {
-            return dto; // hồ sơ rỗng, không lưu
+            // Không có tương tác nhưng vẫn có thể có từ khóa tìm kiếm -> vẫn lưu hồ sơ
+            if (preservedSearch.isEmpty()) {
+                return dto; // hồ sơ rỗng hoàn toàn, không lưu
+            }
+            persistProfile(userId, dto);
+            return dto;
         }
 
         // Nạp product cho các sản phẩm đã tương tác
@@ -108,8 +122,34 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
         dto.setMaterialScores(normalize(matRaw));
         dto.setColorScores(normalize(colorRaw));
         dto.setOriginScores(normalize(originRaw));
+        // searchKeywordScores đã được gán từ đầu (preservedSearch), giữ nguyên
 
-        // Lưu hồ sơ (upsert)
+        persistProfile(userId, dto);
+        return dto;
+    }
+
+    /**
+     * Đọc riêng chiều từ khóa tìm kiếm từ hồ sơ đang lưu (nếu có).
+     * Dùng để bảo toàn khi rebuild hồ sơ từ interactions.
+     */
+    private Map<String, Double> loadSearchKeywords(String userId) {
+        return profileRepository.findByUserId(userId)
+                .map(p -> {
+                    try {
+                        UserPreferenceDTO old = objectMapper.readValue(p.getPreferenceData(), UserPreferenceDTO.class);
+                        return old.getSearchKeywordScores() != null
+                                ? new HashMap<>(old.getSearchKeywordScores())
+                                : new HashMap<String, Double>();
+                    } catch (Exception e) {
+                        log.error("Lỗi đọc searchKeywordScores cũ của user {}", userId, e);
+                        return new HashMap<String, Double>();
+                    }
+                })
+                .orElseGet(HashMap::new);
+    }
+
+    /** Lưu (upsert) hồ sơ sở thích dưới dạng JSON vào cột preference_data. */
+    private void persistProfile(String userId, UserPreferenceDTO dto) {
         try {
             String json = objectMapper.writeValueAsString(dto);
             UserPreferenceProfile profile = profileRepository.findByUserId(userId)
@@ -119,8 +159,48 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
         } catch (Exception e) {
             log.error("Lỗi khi lưu hồ sơ sở thích của user {}", userId, e);
         }
+    }
 
-        return dto;
+    @Override
+    @Transactional
+    public void addSearchKeywords(String userId, String keyword) {
+        if (userId == null || keyword == null || keyword.trim().isEmpty()) return;
+
+        List<String> tokens = TextTokenizer.tokenize(keyword);
+        if (tokens.isEmpty()) return;
+
+        // Đọc hồ sơ hiện tại (hoặc DTO rỗng nếu chưa có) rồi cộng dồn token tìm kiếm
+        UserPreferenceDTO dto = profileRepository.findByUserId(userId)
+                .map(p -> {
+                    try {
+                        return objectMapper.readValue(p.getPreferenceData(), UserPreferenceDTO.class);
+                    } catch (Exception e) {
+                        log.error("Lỗi parse hồ sơ khi thêm từ khóa cho user {}, tạo mới", userId, e);
+                        return new UserPreferenceDTO();
+                    }
+                })
+                .orElseGet(UserPreferenceDTO::new);
+
+        Map<String, Double> searchScores = dto.getSearchKeywordScores();
+        if (searchScores == null) {
+            searchScores = new HashMap<>();
+            dto.setSearchKeywordScores(searchScores);
+        }
+        for (String token : tokens) {
+            searchScores.merge(token, 1.0, Double::sum);
+        }
+
+        // Giới hạn kích thước: giữ lại top MAX_SEARCH_KEYWORDS token điểm cao nhất
+        if (searchScores.size() > MAX_SEARCH_KEYWORDS) {
+            Map<String, Double> trimmed = searchScores.entrySet().stream()
+                    .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                    .limit(MAX_SEARCH_KEYWORDS)
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            dto.setSearchKeywordScores(new HashMap<>(trimmed));
+        }
+
+        persistProfile(userId, dto);
+        log.info("Đã ghi nhận {} token tìm kiếm cho user {}", tokens.size(), userId);
     }
 
     @Override
@@ -161,11 +241,14 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
                 .map(UserProductInteraction::getProductId)
                 .collect(Collectors.toSet());
 
+        // Chuẩn hóa chiều từ khóa tìm kiếm một lần để tái dùng khi chấm điểm mọi sản phẩm
+        Map<String, Double> normalizedSearch = normalize(profile.getSearchKeywordScores());
+
         // 3. Chấm điểm toàn bộ sản phẩm theo hồ sơ sở thích
         List<RecommendationDTO> scored = new ArrayList<>();
         for (Product p : productRepository.findAll()) {
             if (strongInteracted.contains(p.getProductId())) continue;
-            double pref = preferenceScore(profile, p);
+            double pref = preferenceScore(profile, p, normalizedSearch);
             if (pref > 0.0) {
                 RecommendationDTO dto = new RecommendationDTO(p);
                 dto.setSimilarityScore(pref);
@@ -203,9 +286,10 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
         if (profile.isEmpty()) {
             return Collections.emptyMap();
         }
+        Map<String, Double> normalizedSearch = normalize(profile.getSearchKeywordScores());
         Map<String, Double> result = new HashMap<>();
         for (Product p : productRepository.findAll()) {
-            double pref = preferenceScore(profile, p);
+            double pref = preferenceScore(profile, p, normalizedSearch);
             if (pref > 0.0) {
                 result.put(p.getProductId(), pref);
             }
@@ -215,12 +299,35 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
 
     // ---------- Hàm hỗ trợ ----------
 
-    private double preferenceScore(UserPreferenceDTO profile, Product p) {
+    private double preferenceScore(UserPreferenceDTO profile, Product p, Map<String, Double> normalizedSearch) {
         double cat = valueOf(profile.getCategoryScores(), categoryOf(p));
         double mat = valueOf(profile.getMaterialScores(), p.getMaterial());
         double color = valueOf(profile.getColorScores(), p.getColor());
         double origin = valueOf(profile.getOriginScores(), p.getOrigin());
-        return W_CATEGORY * cat + W_MATERIAL * mat + W_COLOR * color + W_ORIGIN * origin;
+        double search = searchMatch(p, normalizedSearch);
+        return W_CATEGORY * cat + W_MATERIAL * mat + W_COLOR * color
+                + W_ORIGIN * origin + W_SEARCH * search;
+    }
+
+    /**
+     * Độ khớp giữa nội dung sản phẩm và từ khóa tìm kiếm của người dùng.
+     * Tokenize (tên + mô tả + chất liệu + danh mục) rồi cộng điểm search chuẩn hóa của token khớp, kẹp về 0..1.
+     */
+    private double searchMatch(Product p, Map<String, Double> normalizedSearch) {
+        if (normalizedSearch == null || normalizedSearch.isEmpty()) return 0.0;
+
+        StringBuilder sb = new StringBuilder();
+        if (p.getProductName() != null) sb.append(p.getProductName()).append(" ");
+        if (p.getDescription() != null) sb.append(p.getDescription()).append(" ");
+        if (p.getMaterial() != null) sb.append(p.getMaterial()).append(" ");
+        String cat = categoryOf(p);
+        if (cat != null) sb.append(cat).append(" ");
+
+        double sum = 0.0;
+        for (String token : new HashSet<>(TextTokenizer.tokenize(sb.toString()))) {
+            sum += normalizedSearch.getOrDefault(token, 0.0);
+        }
+        return Math.min(1.0, sum);
     }
 
     private double valueOf(Map<String, Double> map, String key) {
@@ -243,6 +350,7 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
     /** Chuẩn hóa map về 0..1 bằng cách chia cho giá trị lớn nhất. */
     private Map<String, Double> normalize(Map<String, Double> raw) {
         Map<String, Double> normalized = new HashMap<>();
+        if (raw == null || raw.isEmpty()) return normalized;
         double max = raw.values().stream().mapToDouble(Double::doubleValue).max().orElse(0.0);
         if (max <= 0.0) return normalized;
         for (Map.Entry<String, Double> e : raw.entrySet()) {

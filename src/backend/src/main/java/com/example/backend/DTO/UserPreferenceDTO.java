@@ -30,10 +30,18 @@ public class UserPreferenceDTO {
     @Builder.Default
     private Map<String, Double> originScores = new HashMap<>();
 
+    /**
+     * Điểm từ khóa tìm kiếm: key = token đã chuẩn hóa (vd "sofa", "go"),
+     * value = số lần tích lũy (raw count). Chuẩn hóa 0..1 khi chấm điểm sản phẩm.
+     */
+    @Builder.Default
+    private Map<String, Double> searchKeywordScores = new HashMap<>();
+
     /** True nếu người dùng chưa có đủ dữ liệu để xây hồ sơ sở thích. */
     public boolean isEmpty() {
         return categoryScores.isEmpty() && materialScores.isEmpty()
-                && colorScores.isEmpty() && originScores.isEmpty();
+                && colorScores.isEmpty() && originScores.isEmpty()
+                && searchKeywordScores.isEmpty();
     }
 
     /** Lấy giá trị có điểm cao nhất trong một map (tiện hiển thị "bạn thích nhất...") */

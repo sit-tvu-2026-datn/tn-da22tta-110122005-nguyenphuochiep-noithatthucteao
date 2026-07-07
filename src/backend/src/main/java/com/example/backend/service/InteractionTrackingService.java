@@ -25,4 +25,10 @@ public interface InteractionTrackingService {
      * Ghi nhận tương tác đánh giá sản phẩm (REVIEW - score = rating 1-5).
      */
     void trackReview(String userId, String productId, int rating);
+
+    /**
+     * Ghi nhận từ khóa tìm kiếm của người dùng để cá nhân hóa lọc nội dung.
+     * Lưu vào chiều searchKeywordScores của hồ sơ sở thích (không đụng schema).
+     */
+    void trackSearch(String userId, String keyword);
 }

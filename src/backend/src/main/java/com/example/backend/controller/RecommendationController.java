@@ -1,6 +1,7 @@
 package com.example.backend.controller;
 
 import com.example.backend.DTO.RecommendationResponse;
+import com.example.backend.DTO.SearchTrackingRequest;
 import com.example.backend.DTO.ViewTrackingRequest;
 import com.example.backend.service.InteractionTrackingService;
 import com.example.backend.service.RecommendationService;
@@ -149,6 +150,16 @@ public class RecommendationController {
     @PostMapping("/track-view")
     public ResponseEntity<Void> trackProductView(@RequestBody ViewTrackingRequest request) {
         trackingService.trackView(request.getUserId(), request.getProductId());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * API ghi nhận từ khóa tìm kiếm của người dùng để cá nhân hóa lọc nội dung.
+     * Từ khóa được cộng vào hồ sơ sở thích (chiều searchKeywordScores).
+     */
+    @PostMapping("/track-search")
+    public ResponseEntity<Void> trackSearch(@RequestBody SearchTrackingRequest request) {
+        trackingService.trackSearch(request.getUserId(), request.getKeyword());
         return ResponseEntity.ok().build();
     }
 }

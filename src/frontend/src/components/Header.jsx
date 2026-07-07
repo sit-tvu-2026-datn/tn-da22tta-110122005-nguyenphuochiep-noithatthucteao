@@ -13,6 +13,7 @@ import { CartContext } from "../context/CartContext";
 import MainMenu from "./MainMenu";
 import { message } from "antd";
 import Cookies from "js-cookie";
+import api from "../config/api";
 
 export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -88,8 +89,16 @@ export default function Header() {
   };
 
   const handleSearch = () => {
-    if (keyword.trim()) {
-      navigate(`/products?search=${encodeURIComponent(keyword.trim())}`);
+    const q = keyword.trim();
+    if (q) {
+      // Ghi nhận từ khóa tìm kiếm để cá nhân hóa lọc nội dung (fire-and-forget)
+      const uid = Cookies.get("user_id");
+      if (uid) {
+        api
+          .post("/api/recommend/track-search", { userId: uid, keyword: q })
+          .catch(() => {}); // không chặn điều hướng nếu lỗi
+      }
+      navigate(`/products?search=${encodeURIComponent(q)}`);
     } else {
       navigate(`/products`);
     }

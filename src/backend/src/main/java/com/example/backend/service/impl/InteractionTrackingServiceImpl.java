@@ -171,24 +171,50 @@ public class InteractionTrackingServiceImpl implements InteractionTrackingServic
         }
     }
 
+    @Override
+    @Transactional
+    public void trackSearch(String userId, String keyword) {
+        log.info("Ghi nhận từ khóa tìm kiếm: userId={}, keyword={}", userId, keyword);
+        if (userId == null || keyword == null || keyword.trim().isEmpty()) return;
+
+        try {
+            // Cộng dồn từ khóa vào chiều searchKeywordScores của hồ sơ sở thích
+            userPreferenceService.addSearchKeywords(userId, keyword);
+
+            // Chỉ xóa cache gợi ý (KHÔNG rebuild/xóa hồ sơ) để lần gợi ý sau tính lại theo search mới
+            invalidateUserRecommendationCache(userId);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi ghi nhận từ khóa tìm kiếm: userId={}, keyword={}", userId, keyword, e);
+        }
+    }
+
     /**
      * Làm mới cache gợi ý của người dùng (xóa các khóa cache liên quan trên Database)
-     * và xóa hồ sơ sở thích để buộc tính lại theo tương tác mới nhất.
+     * và xây lại hồ sơ sở thích theo tương tác mới nhất.
+     * Dùng buildProfile (rebuild tại chỗ) thay vì xóa trắng để BẢO TOÀN chiều từ khóa tìm kiếm.
      */
     private void invalidateUserCaches(String userId) {
+        try {
+            invalidateUserRecommendationCache(userId);
+            // Rebuild hồ sơ từ dữ liệu mới nhất, giữ nguyên searchKeywordScores đã tích lũy
+            userPreferenceService.buildProfile(userId);
+            log.info("Đã xóa cache DB + rebuild hồ sơ sở thích cho user {}", userId);
+        } catch (Exception e) {
+            log.error("Lỗi khi làm mới cache/hồ sơ của user {}", userId, e);
+        }
+    }
+
+    /**
+     * Xóa các khóa cache gợi ý của người dùng (collaborative / hybrid / foryou) mà KHÔNG đụng hồ sơ sở thích.
+     */
+    private void invalidateUserRecommendationCache(String userId) {
         String collabKey = "collaborative:" + userId;
         String hybridKey = "hybrid:" + userId;
         String forYouKey = "foryou:" + userId;
 
-        try {
-            cacheRepository.findByCacheKey(collabKey).ifPresent(cacheRepository::delete);
-            cacheRepository.findByCacheKey(hybridKey).ifPresent(cacheRepository::delete);
-            cacheRepository.findByCacheKey(forYouKey).ifPresent(cacheRepository::delete);
-            // Xóa hồ sơ sở thích để lần gợi ý kế tiếp xây lại từ dữ liệu mới
-            userPreferenceService.invalidateProfile(userId);
-            log.info("Đã xóa cache DB + hồ sơ sở thích cũ cho user {}", userId);
-        } catch (Exception e) {
-            log.error("Lỗi khi xóa cache DB của user {}", userId, e);
-        }
+        cacheRepository.findByCacheKey(collabKey).ifPresent(cacheRepository::delete);
+        cacheRepository.findByCacheKey(hybridKey).ifPresent(cacheRepository::delete);
+        cacheRepository.findByCacheKey(forYouKey).ifPresent(cacheRepository::delete);
     }
 }

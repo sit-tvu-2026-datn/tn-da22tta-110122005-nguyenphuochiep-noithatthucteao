@@ -28,6 +28,12 @@ public interface UserPreferenceService {
     void invalidateProfile(String userId);
 
     /**
+     * Ghi nhận từ khóa tìm kiếm của người dùng vào hồ sơ sở thích (chiều searchKeywordScores).
+     * Không đụng schema — lưu trong cột JSON preference_data có sẵn.
+     */
+    void addSearchKeywords(String userId, String keyword);
+
+    /**
      * Lấy gợi ý "Dành riêng cho bạn" dựa trên hồ sơ sở thích đã đa dạng hóa.
      */
     RecommendationResponse getForYouRecommendations(String userId, int limit);
