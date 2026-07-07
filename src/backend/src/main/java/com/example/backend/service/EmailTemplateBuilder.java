@@ -103,7 +103,7 @@ public class EmailTemplateBuilder {
       <div style="display:inline-block; background-color:rgba(255,255,255,0.15); border-radius:999px; padding:8px 20px; margin-bottom:16px;">
         <span style="color:#FFFFFF; font-size:15px; font-weight:600; letter-spacing:2px;">🛋️ NPH SHOP</span>
       </div>
-      <h1 style="margin:8px 0 6px; color:#FFFFFF; font-size:26px; font-weight:700;">🎉 Cảm ơn bạn đã mua hàng!</h1>
+      <h1 style="margin:8px 0 6px; color:#FFFFFF; font-size:26px; font-weight:700;"> Cảm ơn bạn đã mua hàng!</h1>
       <p style="margin:0; color:#FDF6EF; font-size:15px;">Đơn hàng của bạn đã được xác nhận thành công.</p>
     </td>
   </tr>

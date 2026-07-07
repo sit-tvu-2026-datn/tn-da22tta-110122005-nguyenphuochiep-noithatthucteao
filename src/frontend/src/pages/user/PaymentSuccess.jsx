@@ -20,10 +20,7 @@ export default function PaymentSuccess() {
         <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-green-100">
           <CheckCircle className="h-14 w-14 text-green-600" strokeWidth={2.2} />
         </div>
-
-        <div className="text-4xl mb-2" aria-hidden="true">
-          🎉
-        </div>
+        
         <h1 className="text-2xl font-bold text-green-700 mb-2">
           Cảm ơn bạn đã mua hàng!
         </h1>
